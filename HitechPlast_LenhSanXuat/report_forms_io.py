@@ -549,50 +549,70 @@ def _concl_fmt_range(lo, hi):
     return ''
 
 
+def _tpl_cell_v(fm, r, c):
+    """Gia tri MAU (template) cua o (theo o neo neu bi gop). None neu khong co."""
+    a = fm.anchor(r, c)
+    cell = fm.cells.get(a)
+    return cell.get('v') if cell else None
+
+
+def _find_std_range(fm, r, c):
+    """Tim DAI tieu chuan cho o ket qua (r,c):
+    1) cung HANG: o nao co gia tri mau la dai (vd 'Chi tieu | 2-3 | <ket qua>')
+    2) cung COT, quet LEN tren: dai tieu chuan gan nhat (form 2 phan: TC o phan I)."""
+    for cc in range(1, fm.ncol + 1):
+        if cc == c:
+            continue
+        pr = concl_range(_tpl_cell_v(fm, r, cc))
+        if pr:
+            return pr
+    for rr in range(r - 1, 0, -1):
+        pr = concl_range(_tpl_cell_v(fm, rr, c))
+        if pr:
+            return pr
+    return None
+
+
+def _result_label(fm, values, r, c):
+    """Ten chi tieu cho o ket qua: tieu de cung cot (quet len), hoac chu dau hang."""
+    for rr in range(r - 1, 0, -1):
+        s = (fm.text(rr, c, values) or '').strip()
+        if s and concl_num(s) is None and concl_range(s) is None:
+            return s
+    for cc in range(1, fm.ncol + 1):
+        s = (fm.text(r, cc, values) or '').strip()
+        if s and concl_num(s) is None and concl_range(s) is None:
+            return s
+    return f'Chỉ tiêu (hàng {r}, cột {c})'
+
+
 def suggest_conclusion(fm, values):
-    """Quet form: moi HANG neu co 1 o la DAI tieu chuan + 1 o la SO ket qua thi so sanh.
-    Tra ve (checked, issues) voi issues = [(nhan, gia_tri, (lo,hi), 'vượt'|'thấp hơn')]."""
+    """CHI danh gia cac o NGUOI DUNG DA NHAP (trong values) la so, roi tim tieu
+    chuan tuong ung (cung hang / cung cot phia tren). Tra ve (checked, issues)."""
     issues = []
     checked = 0
-    nr, nc = fm.nrow, fm.ncol
-
-    def txt(r, c):
-        return fm.text(r, c, values)
-
-    for r in range(1, nr + 1):
-        rng = rng_c = None
-        for c in range(1, nc + 1):
-            if (r, c) in fm.covered:
-                continue
-            pr = concl_range(txt(r, c))
-            if pr:
-                rng, rng_c = pr, c
-                break
+    for k, v in (values or {}).items():
+        val = concl_num(v)
+        if val is None:
+            continue
+        try:
+            r, c = unkey(k)
+        except Exception:
+            continue
+        if r > fm.nrow or c > fm.ncol:
+            continue
+        rng = _find_std_range(fm, r, c)
         if not rng:
             continue
-        label = ''
-        for c in range(1, nc + 1):
-            if (r, c) in fm.covered:
-                continue
-            s = (txt(r, c) or '').strip()
-            if s and concl_num(s) is None and concl_range(s) is None:
-                label = s
-                break
-        for c in range(1, nc + 1):
-            if c == rng_c or (r, c) in fm.covered:
-                continue
-            val = concl_num(txt(r, c))
-            if val is None:
-                continue
-            checked += 1
-            lo, hi = rng
-            how = None
-            if lo is not None and val < lo:
-                how = 'thấp hơn'
-            elif hi is not None and val > hi:
-                how = 'vượt'
-            if how:
-                issues.append((label or f'Chỉ tiêu hàng {r}', val, rng, how))
+        checked += 1
+        lo, hi = rng
+        how = None
+        if lo is not None and val < lo:
+            how = 'thấp hơn'
+        elif hi is not None and val > hi:
+            how = 'vượt'
+        if how:
+            issues.append((_result_label(fm, values, r, c), val, rng, how))
     return checked, issues
 
 

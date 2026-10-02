@@ -81,6 +81,14 @@ def _safe_name(s):
     return re.sub(r'[\\/:*?"<>|\n\r\t]+', ' ', str(s or '')).strip()[:120] or 'BaoCao'
 
 
+def _norm_vi(s):
+    """Bo dau tieng Viet + ve chu thuong (de do chuoi 'Nguoi lap...')."""
+    import unicodedata
+    t = unicodedata.normalize('NFD', str(s or ''))
+    t = ''.join(ch for ch in t if unicodedata.category(ch) != 'Mn')
+    return t.replace('đ', 'd').replace('Đ', 'D').lower()
+
+
 # =====================================================================
 #  Hop thoai sua o (THIET KE)
 # =====================================================================
@@ -326,6 +334,8 @@ class ReportFormTab(tk.Frame):
         self._undo = []
         self._imgcache = {}
         self._editor = None
+        self._cellbuf = None        # bo nho Copy/Paste dinh dang o (thiet ke form)
+        self._imgbuf = None         # bo nho Cat/Dan anh (sua cho anh add nham)
         self._build()
         self._fill_tree()
         self._fill_reports()
@@ -562,6 +572,7 @@ class ReportFormTab(tk.Frame):
                                   ('➖ Xoá cột', lambda: self.d_cols(0, -1)))),
                           (row2, (('↕ Cao hàng', self.d_row_height), ('↔ Rộng cột', self.d_col_width),
                                   ('🖼 Ảnh mẫu', self.d_tpl_image), ('✖ Xoá ảnh mẫu', self.d_del_tpl_image),
+                                  ('⧉ Copy ô', self.d_copy_cell), ('📋 Paste ô', self.d_paste_cell),
                                   ('🏷 Đặt ô Tên NVL', self.d_name_cell), ('📅 Đặt ô Ngày trả KQ', self.d_date_cell),
                                   ('🧾 Đặt ô Kết luận', self.d_concl_cell)))):
             for t, cmd in items:
@@ -1269,6 +1280,12 @@ class ReportFormTab(tk.Frame):
             self.rec['values'][dk] = rio.now_str() if val.strip() else ''
         self._auto_title()
         self._mark()
+        # Tu dong ghi KET LUAN khi nhap du lieu (tru khi dang ghi chinh o ket luan)
+        if not getattr(self, '_in_concl', False):
+            try:
+                self._auto_conclude(create=True)
+            except Exception:
+                pass
 
     def _clear_sel(self):
         if not self.rec or not self.sel:
@@ -1444,6 +1461,10 @@ class ReportFormTab(tk.Frame):
             m.add_command(label='🖼 Chèn ảnh từ file vào ô…', command=self.insert_image_file)
             m.add_command(label='📋 Dán ảnh vào ô (Ctrl+V)', command=self.paste_image)
             m.add_command(label='✖ Xoá ảnh trong ô', command=self.delete_image)
+            m.add_separator()
+            m.add_command(label='✂ Cắt ảnh trong ô (để chuyển)', command=self.cut_image)
+            m.add_command(label='📌 Dán ảnh đã cắt vào ô này', command=self.paste_cut_image,
+                          state=('normal' if self._imgbuf else 'disabled'))
         m.tk_popup(ev.x_root, ev.y_root)
 
     def _reset_sel(self):
@@ -1618,6 +1639,78 @@ class ReportFormTab(tk.Frame):
             self._tpl_changed()
         CellDesignDialog(self, self.tpl, r, c, ok)
 
+    def d_copy_cell(self):
+        """Copy toan bo dinh dang + noi dung mau cua o dang chon."""
+        if not self._need_design():
+            return
+        r, c = self.sel[0], self.sel[1]
+        src = dict(self._tpl_cell(r, c))
+        src.pop('r', None)
+        src.pop('c', None)
+        lst = (self.tpl.get('lists') or {}).get(key(r, c))
+        self._cellbuf = {'cell': src, 'list': list(lst) if lst else None}
+        self._update_state()
+        messagebox.showinfo('Copy ô', f'Đã copy định dạng ô (hàng {r}, cột {c}).\n'
+                            'Chọn ô/vùng khác rồi bấm "📋 Paste ô".', parent=self)
+
+    def d_paste_cell(self):
+        """Paste dinh dang + noi dung da copy vao CA vung dang chon."""
+        if not self._need_design():
+            return
+        if not self._cellbuf:
+            messagebox.showinfo('Paste ô', 'Chưa copy ô nào. Chọn ô rồi bấm "⧉ Copy ô" trước.', parent=self)
+            return
+        src = self._cellbuf['cell']
+        r0, c0, r1, c1 = self.sel
+        lists = self.tpl.setdefault('lists', {})
+        for rr in range(r0, r1 + 1):
+            for cc in range(c0, c1 + 1):
+                tc = self._tpl_cell(rr, cc)
+                for kk in ('v', 'ref', 'nf'):
+                    tc.pop(kk, None)
+                for kk, vv in src.items():
+                    tc[kk] = copy.deepcopy(vv)
+                tc['r'], tc['c'] = rr, cc
+                if self._cellbuf.get('list'):
+                    lists[key(rr, cc)] = list(self._cellbuf['list'])
+                else:
+                    lists.pop(key(rr, cc), None)
+        self._tpl_changed()
+
+    def cut_image(self):
+        """Cat anh (da chen) trong o dang chon vao bo nho - de chuyen sang o dung."""
+        if self.design.get() or not self.rec:
+            return
+        ims = [im for im in self._imgs_in_sel() if im.get('tpl') is None]
+        if not ims:
+            messagebox.showinfo('Không có ảnh', 'Chọn ô có ảnh (ảnh bạn đã chèn) cần chuyển.', parent=self)
+            return
+        self._push_undo()
+        self._imgbuf = [{'file': im['file']} for im in ims]
+        drop = {im['idx'] for im in ims}
+        self.rec['images'] = [im for j, im in enumerate(self.rec.get('images', [])) if j not in drop]
+        self._mark()
+        self.redraw()
+
+    def paste_cut_image(self):
+        """Dan anh da cat vao o dang chon (chuyen anh add nham ve dung cho)."""
+        if self.design.get() or not self.rec:
+            return
+        if not self._imgbuf:
+            messagebox.showinfo('Dán ảnh', 'Chưa cắt ảnh nào.\nChọn ô có ảnh sai → "✂ Cắt ảnh", '
+                                'rồi chọn ô đúng → "📌 Dán ảnh".', parent=self)
+            return
+        if not self.sel:
+            return
+        self._push_undo()
+        r0, c0, r1, c1 = self.sel
+        for b in self._imgbuf:
+            self.rec.setdefault('images', []).append(
+                {'r0': r0, 'c0': c0, 'r1': r1, 'c1': c1, 'file': b['file']})
+        self._imgbuf = None
+        self._mark()
+        self.redraw()
+
     def d_merge(self):
         if not self._need_design():
             return
@@ -1729,39 +1822,123 @@ class ReportFormTab(tk.Frame):
         self.tpl['date_cell'] = [self.sel[0], self.sel[1]]
         self._tpl_changed()
 
+    @staticmethod
+    def _merge_full_row(form, r):
+        """Gop ca HANG r thanh 1 o full-width [r,1,r,ncol] + style cho o ket luan."""
+        nc = int(form.get('ncol') or len(form.get('cols', [])))
+        if nc < 1:
+            return
+        merges = form.setdefault('merges', [])
+        merges[:] = [m for m in merges if not (m[0] <= r <= m[2])]   # go merge cu chong hang
+        merges.append([r, 1, r, nc])
+        cells = form.setdefault('cells', [])
+        anchor = next((cc for cc in cells if cc['r'] == r and cc['c'] == 1), None)
+        if anchor is None:
+            anchor = {'r': r, 'c': 1}
+            cells.append(anchor)
+        anchor.update({'al': 'left', 'va': 'center', 'wrap': 1,
+                       'sz': anchor.get('sz') or 11.0, 'bd': [1, 1, 1, 1]})
+
     def d_concl_cell(self):
-        """ADMIN: danh dau o se chua KET LUAN (nen dat phia tren dong Nguoi lap bao cao)."""
+        """ADMIN: dat o KET LUAN = gop ca hang dang chon thanh 1 o full-width."""
         if not self._need_design():
             return
-        self.tpl['concl_cell'] = [self.sel[0], self.sel[1]]
+        r = self.sel[0]
+        self._merge_full_row(self.tpl, r)
+        self.tpl['concl_cell'] = [r, 1]
         self._tpl_changed()
 
-    def conclude(self):
-        """Ghi GOI Y ket luan (so sanh ket qua voi tieu chuan) vao o Ket luan.
-        Nguoi lap kiem tra va sua lai neu can."""
+    def _sign_row(self, fm, values):
+        """Tim hang chua 'Nguoi lap bao cao'. None neu khong thay."""
+        for r in range(1, fm.nrow + 1):
+            for c in range(1, fm.ncol + 1):
+                if 'nguoi lap' in _norm_vi(fm.text(r, c, values)):
+                    return r
+        return None
+
+    def _concl_anchor(self, create=False):
+        """Tra (r,c) o Ket luan cua bao cao dang mo.
+        create=True: neu chua co -> tu gop full-width hang TRONG ngay tren
+        dong 'Nguoi lap bao cao'."""
         if not self.rec:
-            messagebox.showinfo('Kết luận', 'Hãy mở một báo cáo trước.', parent=self)
-            return
-        form = self._form()
+            return None
+        form = self.rec['form']
         fm = getattr(self, 'fm', None) or FormModel(form)
         cell = form.get('concl_cell')
         if cell:
-            r, c = fm.area(cell[0], cell[1])[:2]
-        elif self.sel:
-            r, c = self.sel[0], self.sel[1]
-        else:
+            a = fm.area(cell[0], cell[1])
+            return a[0], a[1]
+        if not create:
+            return None
+        values = self.rec.get('values') or {}
+        sr = self._sign_row(fm, values)
+        if not sr or sr < 2:
+            return None
+        tr = sr - 1
+        if any(fm.text(tr, c, values) for c in range(1, fm.ncol + 1)):
+            return None   # hang tren khong trong -> khong tu tao (tranh de len du lieu)
+        self._merge_full_row(form, tr)
+        form['concl_cell'] = [tr, 1]
+        self.fm = FormModel(form)
+        return tr, 1
+
+    def _auto_conclude(self, create=False):
+        """Ghi/ cap nhat ket luan tu dong. KHONG de len neu nguoi lap da tu sua."""
+        if not self.rec or getattr(self, '_in_concl', False):
+            return False
+        values = self.rec.get('values') or {}
+        fm0 = getattr(self, 'fm', None) or FormModel(self.rec['form'])
+        # chi tu dong khi co it nhat 1 chi tieu SO so sanh duoc voi tieu chuan
+        checked, _ = rio.suggest_conclusion(fm0, values)
+        if checked == 0:
+            return False
+        anchor = self._concl_anchor(create=create)
+        if not anchor:
+            return False
+        r, c = anchor
+        fm = getattr(self, 'fm', None) or FormModel(self.rec['form'])
+        cur = fm.text(r, c, values)
+        last = self.rec.get('_concl_auto')
+        # chi ghi khi o dang trong hoac dang la van ban tu dong truoc do
+        if cur and cur != last:
+            return False
+        text = rio.conclusion_text(fm, values)
+        if text == cur:
+            return True
+        self._in_concl = True
+        try:
+            self.fm = fm
+            self._set_value(r, c, text)
+            self.rec['_concl_auto'] = text
+        finally:
+            self._in_concl = False
+        return True
+
+    def conclude(self):
+        """Nut '⚖ Ket luan': tu dat o ket luan (full-width, tren chu ky) + ghi ket luan."""
+        if not self.rec:
+            messagebox.showinfo('Kết luận', 'Hãy mở một báo cáo trước.', parent=self)
+            return
+        anchor = self._concl_anchor(create=True)
+        if not anchor:
             messagebox.showinfo(
                 'Kết luận',
-                'Chưa đặt ô Kết luận.\n\n'
-                '• Admin: bật "✏ Thiết kế form", chọn ô nằm PHÍA TRÊN dòng '
-                '"Người lập báo cáo" rồi bấm "🧾 Đặt ô Kết luận".\n'
-                '• Hoặc: chọn một ô trống rồi bấm lại nút này.',
+                'Chưa tạo được ô Kết luận tự động.\n\n'
+                'Cách thủ công (Admin): bật "✏ Thiết kế form", chọn HÀNG trống nằm '
+                'phía trên dòng "Người lập báo cáo" rồi bấm "🧾 Đặt ô Kết luận".',
                 parent=self)
             return
+        r, c = anchor
+        fm = getattr(self, 'fm', None) or FormModel(self.rec['form'])
         values = self.rec.get('values') or {}
         text = rio.conclusion_text(fm, values)
-        self.fm = fm                      # bảo đảm _set_value dùng đúng model
-        self._set_value(r, c, text)
+        self.fm = fm
+        self._in_concl = True
+        try:
+            self._set_value(r, c, text)
+            self.rec['_concl_auto'] = text
+        finally:
+            self._in_concl = False
         self.sel = fm.area(r, c)
         self.redraw()
         _, issues = rio.suggest_conclusion(fm, values)

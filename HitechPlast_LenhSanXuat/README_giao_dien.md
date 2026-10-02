@@ -49,3 +49,28 @@ Tùy chỉnh tên công ty: mở `rmqr_settings.json`, thêm `"company_name": "T
   dễ nhập. Tăng đệm chữ trái/phải trong ô cho thoáng.
 - **Không ảnh hưởng PDF/Excel xuất ra** (giữ kích thước gốc). Muốn file xuất ra
   cũng rộng hơn thì báo tôi.
+
+---
+
+## Cập nhật thêm (đợt 3)
+
+### Kết luận: full-width, đúng chỗ, TỰ ĐỘNG ghi
+- Ô Kết luận giờ **gộp full chiều ngang** và đặt ở **hàng trống ngay trên dòng
+  "Người lập báo cáo"** (đã dò đúng trên cả 147 form).
+- **Tự động ghi kết luận khi nhập dữ liệu**: mỗi khi nhập 1 chỉ tiêu SỐ mà có
+  tiêu chuẩn tương ứng, app tự so sánh và cập nhật ô Kết luận (ĐẠT / liệt kê chỉ
+  tiêu vượt–thấp hơn). **Không đè** nếu người lập đã tự sửa nội dung kết luận.
+- So sánh đã sửa cho **đúng cấu trúc 2 phần** (Tiêu chuẩn ở phần I, kết quả ở
+  phần II): chỉ đánh giá ô **người dùng thực nhập**, tìm tiêu chuẩn theo **cùng
+  cột (phía trên)** hoặc **cùng hàng** → hết tình trạng báo nhầm khi chưa nhập.
+- Admin vẫn có thể tự đặt: "✏ Thiết kế form" → chọn hàng trống trên chữ ký →
+  "🧾 Đặt ô Kết luận" (tự gộp full-width).
+
+### Chuyển ảnh bị add nhầm ô
+- Chuột phải trong ô → **"✂ Cắt ảnh trong ô (để chuyển)"**, rồi chọn ô đúng →
+  **"📌 Dán ảnh đã cắt vào ô này"**. Ảnh chuyển sang đúng ô, vừa vùng đã chọn.
+
+### Nút Copy / Paste ô khi sửa form (Admin)
+- Trong "✏ Thiết kế form", thanh cam có thêm **"⧉ Copy ô"** và **"📋 Paste ô"**:
+  copy toàn bộ định dạng + nội dung mẫu + danh sách chọn của ô, dán sang ô/vùng
+  khác (áp cho cả vùng đang chọn) → dựng form nhanh hơn nhiều.
