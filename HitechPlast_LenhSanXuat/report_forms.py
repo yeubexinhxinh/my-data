@@ -513,6 +513,8 @@ class ReportFormTab(tk.Frame):
         btn('✖ Xoá ảnh', self.delete_image)
         btn('↶ Hoàn tác', self.undo)
         sep()
+        btn('⚖ Kết luận', self.conclude, bg='#5a4b8a', fg='white', bold=True)
+        sep()
         btn('📄 PDF', self.export_pdf, bg=CLR['danger'], fg='white', bold=True)
         btn('📊 Excel', self.export_excel, bg='#1e7145', fg='white', bold=True)
         btn('🖨 In', self.print_report, bg='#1d3557', fg='white', bold=True)
@@ -560,7 +562,8 @@ class ReportFormTab(tk.Frame):
                                   ('➖ Xoá cột', lambda: self.d_cols(0, -1)))),
                           (row2, (('↕ Cao hàng', self.d_row_height), ('↔ Rộng cột', self.d_col_width),
                                   ('🖼 Ảnh mẫu', self.d_tpl_image), ('✖ Xoá ảnh mẫu', self.d_del_tpl_image),
-                                  ('🏷 Đặt ô Tên NVL', self.d_name_cell), ('📅 Đặt ô Ngày trả KQ', self.d_date_cell)))):
+                                  ('🏷 Đặt ô Tên NVL', self.d_name_cell), ('📅 Đặt ô Ngày trả KQ', self.d_date_cell),
+                                  ('🧾 Đặt ô Kết luận', self.d_concl_cell)))):
             for t, cmd in items:
                 tk.Button(fr, text=t, font=('Segoe UI', 9), relief='groove', bg='white',
                           command=cmd).pack(side='left', padx=1, pady=2)
@@ -923,7 +926,12 @@ class ReportFormTab(tk.Frame):
             return
         fm = FormModel(form)
         self.fm = fm
-        xs, ys = rio.geometry(form, zoom=self.zoom, row_k=96 / 72)
+        # Giãn cột/hàng khi hiển thị trên màn hình cho ô dữ liệu rộng rãi, dễ nhập.
+        # (chỉ ảnh hưởng xem trên app; PDF/Excel xuất ra vẫn giữ kích thước gốc)
+        cs = float(self.settings.get('grid_col_scale', 1.18))   # giãn ngang
+        rs = float(self.settings.get('grid_row_scale', 1.15))   # giãn dọc
+        xs, ys = rio.geometry(form, px_col=7.0 * cs, px_pad=5.0 * cs,
+                              row_k=(96 / 72) * rs, zoom=self.zoom)
         M = 24
         self.xs = [x + M for x in xs]
         self.ys = [y + M for y in ys]
@@ -977,7 +985,8 @@ class ReportFormTab(tk.Frame):
                 single = (r0 == r1 and c0 == c1)
                 wrap = st.get('wrap', 1) or not single
                 fnt = self._font(st)
-                w = max(10, x1 - x0 - 6)
+                pad = 6                      # đệm trái/phải trong ô cho thoáng
+                w = max(10, x1 - x0 - pad * 2)
                 # chu qua cao so voi o -> thu nho (giong PDF)
                 if wrap:
                     for sc in (1.0, 0.9, 0.8, 0.7, 0.6):
@@ -988,9 +997,9 @@ class ReportFormTab(tk.Frame):
                 if al in ('center', 'centerContinuous', 'justify', 'distributed'):
                     ax, anchor_h, just = (x0 + x1) / 2, '', 'center'
                 elif al == 'right':
-                    ax, anchor_h, just = x1 - 3, 'e', 'right'
+                    ax, anchor_h, just = x1 - pad, 'e', 'right'
                 else:
-                    ax, anchor_h, just = x0 + 3, 'w', 'left'
+                    ax, anchor_h, just = x0 + pad, 'w', 'left'
                 if va == 'top':
                     ay, anchor_v = y0 + 2, 'n'
                 elif va == 'center':
@@ -1014,7 +1023,8 @@ class ReportFormTab(tk.Frame):
             else:
                 cv.create_line(xa, yb, xb, yb, fill='#000')
         if design:
-            for nm, cell, col in (('Tên NVL', form.get('name_cell'), '#2d6a4f'), ('Ngày KQ', form.get('date_cell'), '#7b2cbf')):
+            for nm, cell, col in (('Tên NVL', form.get('name_cell'), '#2d6a4f'), ('Ngày KQ', form.get('date_cell'), '#7b2cbf'),
+                                  ('Kết luận', form.get('concl_cell'), '#5a4b8a')):
                 if cell:
                     r0, c0, r1, c1 = fm.area(*cell)
                     cv.create_rectangle(X(c0) + 2, Y(r0) + 2, X(c1 + 1) - 2, Y(r1 + 1) - 2, outline=col, dash=(3, 2), width=2)
@@ -1718,6 +1728,54 @@ class ReportFormTab(tk.Frame):
             return
         self.tpl['date_cell'] = [self.sel[0], self.sel[1]]
         self._tpl_changed()
+
+    def d_concl_cell(self):
+        """ADMIN: danh dau o se chua KET LUAN (nen dat phia tren dong Nguoi lap bao cao)."""
+        if not self._need_design():
+            return
+        self.tpl['concl_cell'] = [self.sel[0], self.sel[1]]
+        self._tpl_changed()
+
+    def conclude(self):
+        """Ghi GOI Y ket luan (so sanh ket qua voi tieu chuan) vao o Ket luan.
+        Nguoi lap kiem tra va sua lai neu can."""
+        if not self.rec:
+            messagebox.showinfo('Kết luận', 'Hãy mở một báo cáo trước.', parent=self)
+            return
+        form = self._form()
+        fm = getattr(self, 'fm', None) or FormModel(form)
+        cell = form.get('concl_cell')
+        if cell:
+            r, c = fm.area(cell[0], cell[1])[:2]
+        elif self.sel:
+            r, c = self.sel[0], self.sel[1]
+        else:
+            messagebox.showinfo(
+                'Kết luận',
+                'Chưa đặt ô Kết luận.\n\n'
+                '• Admin: bật "✏ Thiết kế form", chọn ô nằm PHÍA TRÊN dòng '
+                '"Người lập báo cáo" rồi bấm "🧾 Đặt ô Kết luận".\n'
+                '• Hoặc: chọn một ô trống rồi bấm lại nút này.',
+                parent=self)
+            return
+        values = self.rec.get('values') or {}
+        text = rio.conclusion_text(fm, values)
+        self.fm = fm                      # bảo đảm _set_value dùng đúng model
+        self._set_value(r, c, text)
+        self.sel = fm.area(r, c)
+        self.redraw()
+        _, issues = rio.suggest_conclusion(fm, values)
+        if issues:
+            messagebox.showwarning(
+                'Kết luận',
+                f'Phát hiện {len(issues)} chỉ tiêu NGOÀI tiêu chuẩn.\n'
+                'Đã ghi gợi ý vào ô Kết luận — người lập kiểm tra và sửa lại nếu cần.',
+                parent=self)
+        else:
+            messagebox.showinfo(
+                'Kết luận',
+                'Đã ghi kết luận vào ô. Người lập kiểm tra / chỉnh lại nội dung nếu cần.',
+                parent=self)
 
     def d_save(self):
         if not self.tpl:
