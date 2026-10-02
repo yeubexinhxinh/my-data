@@ -528,6 +528,8 @@ class ReportFormTab(tk.Frame):
         btn('📄 PDF', self.export_pdf, bg=CLR['danger'], fg='white', bold=True)
         btn('📊 Excel', self.export_excel, bg='#1e7145', fg='white', bold=True)
         btn('🖨 In', self.print_report, bg='#1d3557', fg='white', bold=True)
+        sep()
+        btn('📋 Sổ theo dõi', self.open_log, bg='#17426b', fg='white', bold=True)
         self.v_zoom = tk.StringVar(value=f'{int(self.zoom * 100)}%')
         cz = ttk.Combobox(tb, textvariable=self.v_zoom, width=6, state='readonly',
                           values=['50%', '60%', '70%', '80%', '90%', '100%', '120%', '150%'])
@@ -1953,6 +1955,79 @@ class ReportFormTab(tk.Frame):
                 'Kết luận',
                 'Đã ghi kết luận vào ô. Người lập kiểm tra / chỉnh lại nội dung nếu cần.',
                 parent=self)
+
+    def open_log(self):
+        """Mo SO THEO DOI: bang tong hop moi bao cao da luu + xuat Excel."""
+        metas = self.reports.list()
+        recs = []
+        for meta in metas:
+            try:
+                rec = self.reports.load(meta['id'])
+                if rec:
+                    recs.append(rec)
+            except Exception:
+                pass
+        if not recs:
+            messagebox.showinfo('Sổ theo dõi', 'Chưa có báo cáo nào đã lưu.', parent=self)
+            return
+        sums = []
+        for rec in recs:
+            try:
+                sums.append(rio.report_summary(rec))
+            except Exception:
+                pass
+
+        win = tk.Toplevel(self)
+        win.title('📋 Sổ theo dõi chất lượng NVL')
+        win.configure(bg=BG)
+        win.geometry('1180x580')
+        top = tk.Frame(win, bg=CLR['header1'])
+        top.pack(fill='x')
+        tk.Label(top, text='SỔ THEO DÕI CHẤT LƯỢNG NGUYÊN VẬT LIỆU', bg=CLR['header1'],
+                 fg='#ffffff', font=FONT_H).pack(side='left', padx=12, pady=8)
+
+        cols = [('stt', 'STT', 42), ('material', 'Tên nguyên vật liệu', 180),
+                ('supplier', 'Nhà cung cấp', 150), ('address', 'Địa chỉ', 180),
+                ('recv', 'Ngày nhận mẫu', 95), ('res', 'Ngày trả KQ', 95),
+                ('verdict', 'Đánh giá', 95), ('std', 'Tiêu chuẩn gốc', 200),
+                ('sample', 'Kết quả mẫu', 170), ('user', 'Người lập', 110)]
+        fr = tk.Frame(win, bg=BG)
+        fr.pack(fill='both', expand=True, padx=8, pady=6)
+        tv = ttk.Treeview(fr, columns=[c[0] for c in cols], show='headings', style='RF.Treeview')
+        for cid, txt, w in cols:
+            tv.heading(cid, text=txt)
+            tv.column(cid, width=w, stretch=(cid in ('material', 'address', 'std', 'sample')),
+                      anchor=('center' if cid in ('stt', 'recv', 'res', 'verdict') else 'w'))
+        tv.tag_configure('fail', background='#fbd9d7')
+        tv.tag_configure('pass', background='#d7f0dd')
+        ys = ttk.Scrollbar(fr, orient='vertical', command=tv.yview)
+        tv.configure(yscrollcommand=ys.set)
+        tv.pack(side='left', fill='both', expand=True)
+        ys.pack(side='right', fill='y')
+        for i, s in enumerate(sums, 1):
+            tag = 'fail' if s['verdict'] == 'KHÔNG ĐẠT' else ('pass' if s['verdict'] == 'ĐẠT' else '')
+            tv.insert('', 'end', tags=(tag,), values=(
+                i, s['material'], s['supplier'], s['address'], s['date_recv'],
+                s['date_result'], s['verdict'], s['std'], s['sample'], s['user']))
+
+        bar = tk.Frame(win, bg=BG)
+        bar.pack(fill='x', padx=8, pady=(0, 8))
+        tk.Label(bar, text=f'Tổng: {len(sums)} báo cáo', bg=BG, font=FONT).pack(side='left')
+
+        def export():
+            p = filedialog.asksaveasfilename(parent=win, defaultextension='.xlsx',
+                                             filetypes=[('Excel', '*.xlsx')],
+                                             initialfile='SoTheoDoi_NVL.xlsx')
+            if not p:
+                return
+            try:
+                rio.export_log_excel(sums, p)
+                _open_file(p)
+            except Exception as e:
+                messagebox.showerror('Lỗi', f'Không xuất được Excel:\n{e}', parent=win)
+
+        tk.Button(bar, text='📊 Xuất Excel', font=FONT_B, bg=CLR['success'], fg='white',
+                  relief='flat', padx=12, pady=5, cursor='hand2', command=export).pack(side='right')
 
     def d_save(self):
         if not self.tpl:

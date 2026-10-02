@@ -74,3 +74,32 @@ Tùy chỉnh tên công ty: mở `rmqr_settings.json`, thêm `"company_name": "T
 - Trong "✏ Thiết kế form", thanh cam có thêm **"⧉ Copy ô"** và **"📋 Paste ô"**:
   copy toàn bộ định dạng + nội dung mẫu + danh sách chọn của ô, dán sang ô/vùng
   khác (áp cho cả vùng đang chọn) → dựng form nhanh hơn nhiều.
+
+---
+
+## Cập nhật thêm (đợt 4) — SỔ THEO DÕI (sheet tổng hợp)
+
+Thêm nút **"📋 Sổ theo dõi"** trên thanh công cụ. Mở ra bảng tổng hợp **mọi báo
+cáo đã lưu**, mỗi dòng gồm:
+
+| Cột | Nguồn dữ liệu |
+|-----|----------------|
+| Tên nguyên vật liệu | ô Tên NVL (name_cell) |
+| Nhà cung cấp | dò nhãn "Nhà cung cấp" → lấy ô bên phải |
+| Địa chỉ | dò nhãn "Địa chỉ / Address" |
+| Ngày nhận mẫu | dò nhãn "Ngày nhận mẫu" |
+| Ngày trả KQ | ô Ngày trả KQ (date_cell) |
+| Đánh giá kết quả | ĐẠT / KHÔNG ĐẠT (tự so sánh) — tô xanh/đỏ |
+| Tiêu chuẩn gốc | tiêu chuẩn quy định của từng chỉ tiêu (vd `MFI: 2–3`) |
+| Kết quả mẫu | giá trị đo được người lập nhập (vd `MFI: 3.5`) |
+| Người lập | người lập báo cáo |
+
+- Nút **"📊 Xuất Excel"** trong cửa sổ: xuất ra **1 sheet Excel** ("Sổ theo dõi
+  NVL") đúng các cột trên, có tô màu Đạt/Không đạt, in/nộp được ngay.
+- Logic trích xuất + xuất Excel nằm trong `report_forms_io.py`
+  (`extract_fields`, `compare_all`, `report_summary`, `export_log_excel`) — đã
+  test với form thật, xuất Excel đọc lại đúng.
+
+> "Tiêu chuẩn gốc" = tiêu chuẩn quy định (phần I). "Kết quả mẫu" = giá trị người
+> lập nhập (phần II). Nếu bạn muốn hiểu "tiêu chuẩn của mẫu" theo nghĩa khác
+> (vd tiêu chuẩn do NCC công bố), báo tôi để chỉnh cột cho đúng.

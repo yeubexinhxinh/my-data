@@ -630,6 +630,166 @@ def conclusion_text(fm, values):
     return '\n'.join(lines)
 
 
+# ---------------------------------------------------- SO THEO DOI (tong hop)
+def _norm2(s):
+    """Bo dau tieng Viet + chu thuong (dung cho do nhan field)."""
+    import unicodedata
+    t = unicodedata.normalize('NFD', str(s or ''))
+    t = ''.join(ch for ch in t if unicodedata.category(ch) != 'Mn')
+    return t.replace('đ', 'd').replace('Đ', 'D').lower()
+
+
+_FIELD_LABELS = {
+    'material': ('ten nguyen vat lieu', 'ten nvl', 'ten san pham', 'ten vat tu'),
+    'supplier': ('nha cung cap', 'supplier'),
+    'address':  ('dia chi', 'address'),
+    'date_recv': ('ngay nhan mau', 'sample received', 'ngay nhan'),
+    'date_result': ('ngay tra kq', 'ngay tra', 'test result'),
+}
+
+
+def _value_right_of(fm, r, c, values):
+    """Gia tri nam ben phai o nhan (cung hang), bo qua o trong."""
+    parts = []
+    for cc in range(c + 1, fm.ncol + 1):
+        if fm.anchor(r, cc) == (r, c):
+            continue
+        t = (fm.text(r, cc, values) or '').strip()
+        if t:
+            parts.append(t)
+    return ' '.join(parts).strip()
+
+
+def extract_fields(fm, values):
+    """Trich cac field tieu de tu 1 bao cao: material/supplier/address/date_recv/date_result."""
+    out = {'material': '', 'supplier': '', 'address': '', 'date_recv': '', 'date_result': ''}
+    nc = fm.f.get('name_cell')
+    dc = fm.f.get('date_cell')
+    if nc:
+        out['material'] = (fm.text(nc[0], nc[1], values) or '').strip()
+    if dc:
+        out['date_result'] = (fm.text(dc[0], dc[1], values) or '').strip()
+    for r in range(1, fm.nrow + 1):
+        for c in range(1, fm.ncol + 1):
+            if (r, c) in fm.covered:
+                continue
+            lab = _norm2(fm.text(r, c, values))
+            if not lab:
+                continue
+            for name, keys in _FIELD_LABELS.items():
+                if out[name]:
+                    continue
+                if any(k in lab for k in keys):
+                    val = _value_right_of(fm, r, c, values)
+                    if not val:
+                        raw = fm.text(r, c, values) or ''
+                        if ':' in raw:
+                            val = raw.split(':', 1)[1]
+                        val = re.sub(r'\([^)]*\)', '', val).strip()
+                    out[name] = val
+    return out
+
+
+def compare_all(fm, values):
+    """Moi o NGUOI DUNG NHAP la so + co tieu chuan -> (nhan, tc_goc, kq_mau, dat?)."""
+    rows = []
+    for k, v in (values or {}).items():
+        val = concl_num(v)
+        if val is None:
+            continue
+        try:
+            r, c = unkey(k)
+        except Exception:
+            continue
+        if r > fm.nrow or c > fm.ncol:
+            continue
+        rng = _find_std_range(fm, r, c)
+        if not rng:
+            continue
+        lo, hi = rng
+        ok = not ((lo is not None and val < lo) or (hi is not None and val > hi))
+        rows.append((_result_label(fm, values, r, c), _concl_fmt_range(lo, hi), _concl_fmt(val), ok))
+    return rows
+
+
+def report_summary(rec):
+    """Tom tat 1 bao cao thanh 1 dong cho so theo doi."""
+    form = rec.get('form') or {}
+    fm = FormModel(form)
+    values = rec.get('values') or {}
+    fields = extract_fields(fm, values)
+    rows = compare_all(fm, values)
+    checked, issues = suggest_conclusion(fm, values)
+    verdict = '' if checked == 0 else ('KHÔNG ĐẠT' if issues else 'ĐẠT')
+    std_str = '; '.join(f'{lb}: {std}' for (lb, std, val, ok) in rows)
+    sample_str = '; '.join(f'{lb}: {val}' for (lb, std, val, ok) in rows)
+    return {
+        'title': rec.get('title') or '',
+        'form_name': rec.get('form_name') or '',
+        'material': fields['material'] or rec.get('material') or '',
+        'supplier': fields['supplier'],
+        'address': fields['address'],
+        'date_recv': fields['date_recv'],
+        'date_result': fields['date_result'],
+        'verdict': verdict,
+        'std': std_str,
+        'sample': sample_str,
+        'user': rec.get('user') or '',
+    }
+
+
+def export_log_excel(summaries, path):
+    """Xuat SO THEO DOI (tong hop nhieu bao cao) ra 1 sheet Excel."""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'So theo doi NVL'
+    headers = ['STT', 'Tên nguyên vật liệu', 'Nhà cung cấp', 'Địa chỉ',
+               'Ngày nhận mẫu', 'Ngày trả KQ', 'Đánh giá kết quả',
+               'Tiêu chuẩn gốc', 'Kết quả mẫu', 'Người lập']
+    widths = [5, 26, 22, 28, 15, 15, 14, 34, 30, 16]
+    thin = Side(style='thin', color='BBBBBB')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    head_fill = PatternFill('solid', fgColor='17426B')
+    head_font = Font(bold=True, color='FFFFFF', name='Calibri', size=11)
+    ws.append([])  # chua tieu de lon
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    c = ws.cell(1, 1, 'SỔ THEO DÕI CHẤT LƯỢNG NGUYÊN VẬT LIỆU')
+    c.font = Font(bold=True, size=14, color='17426B')
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 24
+    ws.append(headers)
+    for j, w in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(j)].width = w
+        hc = ws.cell(2, j)
+        hc.fill = head_fill
+        hc.font = head_font
+        hc.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        hc.border = border
+    for i, s in enumerate(summaries, 1):
+        row = [i, s['material'], s['supplier'], s['address'], s['date_recv'],
+               s['date_result'], s['verdict'], s['std'], s['sample'], s['user']]
+        ws.append(row)
+        rr = ws.max_row
+        for j in range(1, len(headers) + 1):
+            cell = ws.cell(rr, j)
+            cell.border = border
+            cell.alignment = Alignment(vertical='center',
+                                       wrap_text=(j in (2, 3, 4, 8, 9)),
+                                       horizontal=('center' if j in (1, 5, 6, 7) else 'left'))
+            if j == 7 and s['verdict']:   # to mau cot danh gia
+                if s['verdict'] == 'ĐẠT':
+                    cell.fill = PatternFill('solid', fgColor='D7F0DD')
+                    cell.font = Font(bold=True, color='1E7145')
+                else:
+                    cell.fill = PatternFill('solid', fgColor='FBD9D7')
+                    cell.font = Font(bold=True, color='B0413E')
+    ws.freeze_panes = 'A3'
+    wb.save(path)
+    return path
+
+
 # ---------------------------------------------------------------- PDF
 _PDF_FONTS = {}
 
