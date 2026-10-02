@@ -53,6 +53,18 @@ static std::string toUpper(std::string s) {
     return s;
 }
 
+// Tach chuoi theo dau phan cach (vd "1,2,3,4" -> {"1","2","3","4"}); bo phan tu rong
+static std::vector<std::string> splitList(const std::string& s, char sep) {
+    std::vector<std::string> out;
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, sep)) {
+        item = trim(item);
+        if (!item.empty()) out.push_back(item);
+    }
+    return out;
+}
+
 // ---------------------------------------------------------------------------
 // Chuyen ten phim (trong config) sang ma Virtual-Key cua Windows
 // Ho tro: A-Z, 0-9, F1-F12, va mot so phim dac biet pho bien.
@@ -159,6 +171,23 @@ struct TimerAction {
 };
 
 // ---------------------------------------------------------------------------
+// Cau truc mot "chuoi combo": nhan nhieu phim lan luot theo thu tu (1->2->3->4)
+//   - step_delay_ms : cho giua moi phim trong chuoi
+//   - loop_delay_ms : cho sau khi xong chuoi roi lap lai tu dau
+//   - jitter_ms     : dao ngau nhien +/- cho cac khoang cho
+// ---------------------------------------------------------------------------
+struct ComboAction {
+    std::string name = "combo";    // ten de hien thi log
+    std::vector<WORD> vks;         // danh sach ma phim theo thu tu
+    std::vector<std::string> keyNames; // ten phim tuong ung (de log)
+    int stepDelayMs = 300;         // cho giua cac phim
+    int loopDelayMs = 1000;        // cho truoc khi lap lai chuoi
+    int jitterMs = 0;              // dao ngau nhien +/- (ms)
+    size_t index = 0;              // vi tri phim ke tiep trong chuoi (noi bo)
+    DWORD nextFire = 0;           // thoi diem nhan phim ke tiep (noi bo)
+};
+
+// ---------------------------------------------------------------------------
 // Doc mau 1 pixel.
 //   hwnd == NULL                : (x,y) la toa do man hinh tuyet doi.
 //   hwnd hop le, useWindowDC=0  : (x,y) tuong doi vung client -> doi sang
@@ -211,13 +240,18 @@ static void sendKey(WORD vk) {
     SendInput(2, in, sizeof(INPUT));
 }
 
-// Tinh chu ky ke tiep cua mot timer (co dao ngau nhien +/- jitter)
-static DWORD nextInterval(const TimerAction& t) {
+// Tinh mot khoang cho (ms) co dao ngau nhien +/- jitter, toi thieu 10ms
+static DWORD jitteredDelay(int base, int jitter) {
     int j = 0;
-    if (t.jitterMs > 0) j = (rand() % (2 * t.jitterMs + 1)) - t.jitterMs;
-    int iv = t.intervalMs + j;
+    if (jitter > 0) j = (rand() % (2 * jitter + 1)) - jitter;
+    int iv = base + j;
     if (iv < 10) iv = 10;
     return (DWORD)iv;
+}
+
+// Tinh chu ky ke tiep cua mot timer (co dao ngau nhien +/- jitter)
+static DWORD nextInterval(const TimerAction& t) {
+    return jitteredDelay(t.intervalMs, t.jitterMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +266,7 @@ struct AppConfig {
     bool useWindowDC = false;          // true = doc truc tiep tu DC cua so
     std::vector<PixelMonitor> monitors;
     std::vector<TimerAction>  timers;
+    std::vector<ComboAction>  combos;
 };
 
 static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err) {
@@ -241,10 +276,11 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
         return false;
     }
 
-    enum Block { B_GENERAL, B_MONITOR, B_TIMER };
+    enum Block { B_GENERAL, B_MONITOR, B_TIMER, B_COMBO };
     Block blk = B_GENERAL;
     PixelMonitor curM;
     TimerAction  curT;
+    ComboAction  curC;
 
     // Luu lai block vua xong truoc khi chuyen sang block khac
     auto flush = [&]() {
@@ -254,6 +290,8 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
         } else if (blk == B_TIMER) {
             curT.vk = keyNameToVk(curT.keyName);
             cfg.timers.push_back(curT);
+        } else if (blk == B_COMBO) {
+            cfg.combos.push_back(curC);
         }
     };
 
@@ -268,6 +306,9 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
         }
         if (up == "[TIMER]") {
             flush(); curT = TimerAction(); blk = B_TIMER; continue;
+        }
+        if (up == "[COMBO]") {
+            flush(); curC = ComboAction(); blk = B_COMBO; continue;
         }
         if (up == "[GENERAL]") {
             flush(); blk = B_GENERAL; continue;
@@ -301,17 +342,38 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
             else if (key == "INTERVAL_MS") curT.intervalMs = atoi(val.c_str());
             else if (key == "JITTER_MS")   curT.jitterMs = atoi(val.c_str());
         }
+        else if (blk == B_COMBO) {
+            if (key == "NAME") curC.name = val;
+            else if (key == "KEYS") {
+                // "1,2,3,4" -> danh sach phim theo thu tu
+                curC.vks.clear();
+                curC.keyNames.clear();
+                for (const auto& k : splitList(val, ',')) {
+                    WORD vk = keyNameToVk(k);
+                    curC.vks.push_back(vk);         // giu ca phim loi (vk==0) de bao
+                    curC.keyNames.push_back(k);
+                }
+            }
+            else if (key == "STEP_DELAY_MS") curC.stepDelayMs = atoi(val.c_str());
+            else if (key == "LOOP_DELAY_MS") curC.loopDelayMs = atoi(val.c_str());
+            else if (key == "JITTER_MS")     curC.jitterMs = atoi(val.c_str());
+        }
     }
     flush();
 
-    if (cfg.monitors.empty() && cfg.timers.empty()) {
-        err = "Config khong co [monitor] hay [timer] nao.";
+    if (cfg.monitors.empty() && cfg.timers.empty() && cfg.combos.empty()) {
+        err = "Config khong co [monitor], [timer] hay [combo] nao.";
         return false;
     }
     if (cfg.pollIntervalMs < 10) cfg.pollIntervalMs = 10;
     for (auto& t : cfg.timers) {
         if (t.intervalMs < 10) t.intervalMs = 10;
         if (t.jitterMs < 0)    t.jitterMs = 0;
+    }
+    for (auto& c : cfg.combos) {
+        if (c.stepDelayMs < 10) c.stepDelayMs = 10;
+        if (c.loopDelayMs < 10) c.loopDelayMs = 10;
+        if (c.jitterMs < 0)     c.jitterMs = 0;
     }
     return true;
 }
@@ -362,6 +424,7 @@ int main() {
     std::cout << " AutoHelper da nap cau hinh thanh cong.\n";
     std::cout << " So diem theo doi : " << cfg.monitors.size() << "\n";
     std::cout << " So phim chu ky   : " << cfg.timers.size() << "\n";
+    std::cout << " So chuoi combo   : " << cfg.combos.size() << "\n";
     std::cout << " Chu ky quet      : " << cfg.pollIntervalMs << " ms\n";
     if (cfg.windowTitle.empty()) {
         std::cout << " Che do toa do    : MAN HINH TUYET DOI\n";
@@ -387,6 +450,17 @@ int main() {
                   << (t.jitterMs ? (" +/-" + std::to_string(t.jitterMs) + "ms") : "")
                   << "\n";
     }
+    for (const auto& c : cfg.combos) {
+        std::cout << "  > " << c.name << " [";
+        for (size_t i = 0; i < c.keyNames.size(); ++i) {
+            std::cout << c.keyNames[i]
+                      << (c.vks[i] == 0 ? "(!)" : "")
+                      << (i + 1 < c.keyNames.size() ? "->" : "");
+        }
+        std::cout << "] step=" << c.stepDelayMs << "ms loop=" << c.loopDelayMs << "ms"
+                  << (c.jitterMs ? (" +/-" + std::to_string(c.jitterMs) + "ms") : "")
+                  << "\n";
+    }
     std::cout << "============================================\n";
     std::cout << " F9  = Bat/Tat tu dong\n";
     std::cout << " F10 = In mau pixel hien tai (do mau)\n";
@@ -407,9 +481,10 @@ int main() {
             running = !running;
             std::cout << " Trang thai: " << (running ? "BAT" : "TAT") << "\n";
             if (running) {
-                // khi vua bat: lap lich cho cac timer (nhan ngay o chu ky dau)
+                // khi vua bat: lap lich cho timer va combo (chay ngay o buoc dau)
                 DWORD now = GetTickCount();
                 for (auto& t : cfg.timers) t.nextFire = now;
+                for (auto& c : cfg.combos) { c.index = 0; c.nextFire = now; }
             }
         }
         if (f10 && !prevF10) {
@@ -465,6 +540,30 @@ int main() {
                     t.nextFire = now + nextInterval(t);
                     std::cout << " [" << t.name << "] ~ nhan phim "
                               << t.keyName << "\n";
+                }
+            }
+
+            // --- Chuoi combo: nhan cac phim lan luot theo thu tu ---
+            for (auto& c : cfg.combos) {
+                if (c.vks.empty()) continue;           // chuoi rong
+                if (needWindow && hwnd == NULL) continue; // chua co cua so
+                if ((long)(now - c.nextFire) < 0) continue; // chua toi luot
+
+                WORD vk = c.vks[c.index];
+                const std::string& kn = c.keyNames[c.index];
+                if (vk != 0) {
+                    sendKey(vk);
+                    std::cout << " [" << c.name << "] > nhan phim " << kn
+                              << " (" << (c.index + 1) << "/" << c.vks.size() << ")\n";
+                }
+
+                // sang phim ke tiep; het chuoi thi quay lai dau va cho loop_delay
+                c.index++;
+                if (c.index >= c.vks.size()) {
+                    c.index = 0;
+                    c.nextFire = now + jitteredDelay(c.loopDelayMs, c.jitterMs);
+                } else {
+                    c.nextFire = now + jitteredDelay(c.stepDelayMs, c.jitterMs);
                 }
             }
         }

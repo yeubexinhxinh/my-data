@@ -34,6 +34,24 @@ jitter_ms = 150       # dao động ngẫu nhiên +/- 0.15 giây
 Bạn có thể khai báo nhiều `[timer]` cùng lúc (mỗi skill một timer) và chúng chạy
 song song với các `[monitor]` HP/MP. Tất cả đều bật/tắt chung bằng **F9**.
 
+### Chuỗi combo theo thứ tự (1→2→3→4)
+
+Khối `[combo]` nhấn **một chuỗi phím lần lượt theo thứ tự**, thay vì mỗi phím một
+timer riêng. Sau khi hết chuỗi, nó nghỉ `loop_delay_ms` rồi lặp lại từ đầu.
+
+```ini
+[combo]
+name = Combo1
+keys = 1,2,3,4        # nhấn lần lượt 1 -> 2 -> 3 -> 4
+step_delay_ms = 300   # cách nhau 0.3s giữa mỗi phím
+loop_delay_ms = 1500  # xong chuỗi, nghỉ 1.5s rồi lặp lại
+jitter_ms = 80        # dao động ngẫu nhiên +/- cho các khoảng chờ
+```
+
+`keys` nhận cùng danh sách tên phím như trên (`Q,W,E,R,SPACE`, `F1,F2,...`,
+`NUM1,...`). Có thể khai báo nhiều `[combo]`; chúng chạy song song với `[timer]`
+và `[monitor]`, cùng bật/tắt bằng **F9**.
+
 ### Bám theo cửa sổ game (chống lệch khi di chuyển cửa sổ)
 
 Nếu bạn đặt `window_title` trong `[general]`, tool sẽ **tìm cửa sổ game theo tiêu
@@ -124,6 +142,16 @@ Mỗi `[monitor]` là một điểm theo dõi:
 | `key` | Phím sẽ nhấn (cùng danh sách phím như trên) |
 | `interval_ms` | Chu kỳ nhấn (ms) |
 | `jitter_ms` | Dao động ngẫu nhiên +/- quanh chu kỳ (ms). 0 = đều tăm tắp |
+
+`[combo]` (chuỗi phím theo thứ tự):
+
+| Khóa | Ý nghĩa |
+|------|---------|
+| `name` | Tên hiển thị trong log |
+| `keys` | Danh sách phím cách nhau bằng dấu phẩy, nhấn theo thứ tự (vd `1,2,3,4`) |
+| `step_delay_ms` | Thời gian chờ giữa mỗi phím trong chuỗi (ms) |
+| `loop_delay_ms` | Thời gian chờ sau khi xong chuỗi, trước khi lặp lại (ms) |
+| `jitter_ms` | Dao động ngẫu nhiên +/- cho các khoảng chờ (ms) |
 
 ## Lưu ý
 
