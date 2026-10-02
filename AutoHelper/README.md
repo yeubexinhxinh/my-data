@@ -1,9 +1,27 @@
 # AutoHelper
 
-Tool C++ cho Windows: **theo dõi màu pixel tại tọa độ** (ví dụ thanh HP/MP) và
+Tool cho Windows: **theo dõi màu pixel tại tọa độ** (ví dụ thanh HP/MP) và
 **tự động nhấn phím** (dùng thuốc) khi màu cho thấy máu/mana đã tụt dưới ngưỡng.
 
 Toàn bộ code do bạn sở hữu — chỉ dùng WinAPI chuẩn, không phụ thuộc thư viện ngoài.
+
+Có **2 bản, cùng tính năng, cùng đọc một file `config.ini`**:
+
+- **Bản C++** (`main.cpp`) — build ra `.exe`, chạy nhanh. Xem mục *Build* bên dưới.
+- **Bản Python** (`autohelper.py`) — chạy ngay không cần build, tiện để test nhanh.
+
+## Chạy bản Python (nhanh để test)
+
+Cần **Python 3** trên Windows (không cần cài thêm thư viện — dùng `ctypes` gọi
+WinAPI trực tiếp). Đặt `autohelper.py` cạnh `config.ini` rồi chạy:
+
+```bat
+python autohelper.py
+```
+
+> Nên chạy Command Prompt **với quyền Administrator** để phím gửi vào được cửa sổ
+> game. Phím điều khiển giống hệt bản C++: **F9** bật/tắt, **F10** dò màu,
+> **F12** thoát. Tool này chỉ chạy trên Windows.
 
 ## Cách hoạt động
 
