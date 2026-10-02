@@ -1,0 +1,8 @@
+# Python
+__pycache__/
+*.pyc
+
+# Build output (C++)
+*.exe
+*.obj
+*.o
