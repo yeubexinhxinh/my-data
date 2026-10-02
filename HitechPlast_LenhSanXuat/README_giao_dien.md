@@ -103,3 +103,17 @@ cáo đã lưu**, mỗi dòng gồm:
 > "Tiêu chuẩn gốc" = tiêu chuẩn quy định (phần I). "Kết quả mẫu" = giá trị người
 > lập nhập (phần II). Nếu bạn muốn hiểu "tiêu chuẩn của mẫu" theo nghĩa khác
 > (vd tiêu chuẩn do NCC công bố), báo tôi để chỉnh cột cho đúng.
+
+---
+
+## Cập nhật thêm (đợt 5) — Ảnh: Copy / Chèn / Fit vừa ô (cho người dùng thường)
+
+Tất cả thao tác ảnh dưới đây **người dùng thường đều làm được** (không cần Admin):
+
+- **🖼 Chèn ảnh** (nút sẵn có) + **📋 Dán ảnh** (Ctrl+V): chèn ảnh vào ô đang chọn.
+- **⧉ Copy ảnh** (chuột phải): chép ảnh trong ô (giữ ảnh cũ) → chọn ô khác →
+  **📌 Dán ảnh**. (Khác với **✂ Cắt ảnh** = chuyển ảnh đi.)
+- **↔ Fit ảnh** (nút trên thanh công cụ + chuột phải "Fit ảnh vừa ô khung"):
+  ảnh **phủ kín ô khung, độ rộng = ô**. Bấm **"⤢ Ảnh giữ tỉ lệ"** để trả về mặc định.
+- Chế độ fit được **lưu theo ảnh** và áp dụng đồng nhất cả **trên màn hình, PDF và
+  Excel** (thêm `fit_box2` + cờ `fit` cho mỗi ảnh).

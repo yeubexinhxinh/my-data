@@ -520,6 +520,7 @@ class ReportFormTab(tk.Frame):
         sep()
         btn('🖼 Chèn ảnh', self.insert_image_file)
         btn('📋 Dán ảnh', self.paste_image)
+        btn('↔ Fit ảnh', lambda: self.fit_image_cell('fill'))
         btn('✖ Xoá ảnh', self.delete_image)
         btn('↶ Hoàn tác', self.undo)
         sep()
@@ -1054,13 +1055,14 @@ class ReportFormTab(tk.Frame):
             return
         try:
             from PIL import Image, ImageTk
+            mode = im.get('fit') or 'contain'
             bw, bh = max(4, x1 - x0 - 4), max(4, y1 - y0 - 4)
-            ck = (p, int(bw), int(bh))
+            ck = (p, int(bw), int(bh), mode)
             ph = self._imgcache.get(ck)
             if ph is None:
                 pil = Image.open(p)
                 pil.load()
-                w, h, dx, dy = rio.fit_box(pil.width, pil.height, bw, bh)
+                w, h, dx, dy = rio.fit_box2(pil.width, pil.height, bw, bh, mode)
                 pil = pil.convert('RGBA').resize((max(1, int(w)), max(1, int(h))), Image.LANCZOS)
                 ph = (ImageTk.PhotoImage(pil), dx, dy)
                 self._imgcache[ck] = ph
@@ -1464,8 +1466,12 @@ class ReportFormTab(tk.Frame):
             m.add_command(label='📋 Dán ảnh vào ô (Ctrl+V)', command=self.paste_image)
             m.add_command(label='✖ Xoá ảnh trong ô', command=self.delete_image)
             m.add_separator()
+            m.add_command(label='↔ Fit ảnh vừa ô khung (rộng = ô)', command=lambda: self.fit_image_cell('fill'))
+            m.add_command(label='⤢ Ảnh giữ tỉ lệ (mặc định)', command=lambda: self.fit_image_cell('contain'))
+            m.add_separator()
+            m.add_command(label='⧉ Copy ảnh trong ô', command=self.copy_image)
             m.add_command(label='✂ Cắt ảnh trong ô (để chuyển)', command=self.cut_image)
-            m.add_command(label='📌 Dán ảnh đã cắt vào ô này', command=self.paste_cut_image,
+            m.add_command(label='📌 Dán ảnh vào ô này', command=self.paste_cut_image,
                           state=('normal' if self._imgbuf else 'disabled'))
         m.tk_popup(ev.x_root, ev.y_root)
 
@@ -1679,6 +1685,17 @@ class ReportFormTab(tk.Frame):
                     lists.pop(key(rr, cc), None)
         self._tpl_changed()
 
+    def copy_image(self):
+        """Copy anh (da chen) trong o dang chon vao bo nho - giu nguyen anh cu."""
+        if self.design.get() or not self.rec:
+            return
+        ims = [im for im in self._imgs_in_sel() if im.get('tpl') is None]
+        if not ims:
+            messagebox.showinfo('Không có ảnh', 'Chọn ô có ảnh (ảnh bạn đã chèn) cần copy.', parent=self)
+            return
+        self._imgbuf = [{'file': im['file'], 'fit': im.get('fit')} for im in ims]
+        messagebox.showinfo('Copy ảnh', f'Đã copy {len(ims)} ảnh.\nChọn ô khác rồi "📌 Dán ảnh".', parent=self)
+
     def cut_image(self):
         """Cat anh (da chen) trong o dang chon vao bo nho - de chuyen sang o dung."""
         if self.design.get() or not self.rec:
@@ -1688,28 +1705,54 @@ class ReportFormTab(tk.Frame):
             messagebox.showinfo('Không có ảnh', 'Chọn ô có ảnh (ảnh bạn đã chèn) cần chuyển.', parent=self)
             return
         self._push_undo()
-        self._imgbuf = [{'file': im['file']} for im in ims]
+        self._imgbuf = [{'file': im['file'], 'fit': im.get('fit')} for im in ims]
         drop = {im['idx'] for im in ims}
         self.rec['images'] = [im for j, im in enumerate(self.rec.get('images', [])) if j not in drop]
         self._mark()
         self.redraw()
 
     def paste_cut_image(self):
-        """Dan anh da cat vao o dang chon (chuyen anh add nham ve dung cho)."""
+        """Dan anh da copy/cat vao o dang chon."""
         if self.design.get() or not self.rec:
             return
         if not self._imgbuf:
-            messagebox.showinfo('Dán ảnh', 'Chưa cắt ảnh nào.\nChọn ô có ảnh sai → "✂ Cắt ảnh", '
-                                'rồi chọn ô đúng → "📌 Dán ảnh".', parent=self)
+            messagebox.showinfo('Dán ảnh', 'Chưa copy/cắt ảnh nào.\n'
+                                'Chọn ô có ảnh → "⧉ Copy ảnh" hoặc "✂ Cắt ảnh", rồi chọn ô đích → "📌 Dán ảnh".',
+                                parent=self)
             return
         if not self.sel:
             return
         self._push_undo()
         r0, c0, r1, c1 = self.sel
         for b in self._imgbuf:
-            self.rec.setdefault('images', []).append(
-                {'r0': r0, 'c0': c0, 'r1': r1, 'c1': c1, 'file': b['file']})
-        self._imgbuf = None
+            item = {'r0': r0, 'c0': c0, 'r1': r1, 'c1': c1, 'file': b['file']}
+            if b.get('fit'):
+                item['fit'] = b['fit']
+            self.rec.setdefault('images', []).append(item)
+        self._mark()
+        self.redraw()
+
+    def fit_image_cell(self, mode='fill'):
+        """Chinh anh trong o dang chon: 'fill' = phu kin o khung (rong = o);
+        'contain' = giu ti le (mac dinh). Danh cho NGUOI DUNG (anh da chen)."""
+        if not self.rec:
+            return
+        ims = [im for im in self._imgs_in_sel() if im.get('tpl') is None]
+        if not ims:
+            if self._imgs_in_sel():
+                messagebox.showinfo('Ảnh mẫu', 'Ô này là ảnh mẫu của form (chỉ Admin chỉnh).', parent=self)
+            else:
+                messagebox.showinfo('Không có ảnh', 'Chọn ô có ảnh (ảnh bạn đã chèn) để chỉnh.', parent=self)
+            return
+        self._push_undo()
+        imgs = self.rec.get('images', [])
+        for im in ims:
+            j = im.get('idx')
+            if j is not None and 0 <= j < len(imgs):
+                if mode == 'contain':
+                    imgs[j].pop('fit', None)
+                else:
+                    imgs[j]['fit'] = mode
         self._mark()
         self.redraw()
 

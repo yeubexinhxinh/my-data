@@ -489,6 +489,20 @@ def fit_box(iw, ih, bw, bh):
     return w, h, (bw - w) / 2, (bh - h) / 2
 
 
+def fit_box2(iw, ih, bw, bh, mode='contain'):
+    """Nhu fit_box nhung co che do:
+       'contain' (mac dinh): vua khung, giu ti le.
+       'fill'   : phu KIN ca o khung (rong = o, cao = o) - 'fix rong bang o'.
+       'width'  : rong = o, cao theo ti le (can giua doc)."""
+    if mode == 'fill':
+        return bw, bh, 0, 0
+    if mode == 'width' and iw > 0 and ih > 0:
+        w = bw
+        h = w * ih / iw
+        return w, h, 0, max(0.0, (bh - h) / 2)
+    return fit_box(iw, ih, bw, bh)
+
+
 def all_images(rec):
     """Anh mau (khong bi an) + anh cua bao cao."""
     form = rec['form']
@@ -989,7 +1003,7 @@ def draw_report_pdf(c, rec, x0, y0, avail_w, avail_h, k=None, r_from=1, r_to=Non
             bx, by = X(im['c0']), Y(im['r1'] + 1)
             bw, bh = X(im['c1'] + 1) - bx, Y(im['r0']) - by
             pad = 2
-            w, h, dx, dy = fit_box(iw, ih, bw - 2 * pad, bh - 2 * pad)
+            w, h, dx, dy = fit_box2(iw, ih, bw - 2 * pad, bh - 2 * pad, im.get('fit') or 'contain')
             c.drawImage(ir, bx + pad + dx, by + pad + dy, w, h, mask='auto')
         except Exception:
             continue
@@ -1248,7 +1262,7 @@ def export_excel(rec, path, sheet_title=None):
             iw, ih = pil.size
             bw = xs[im['c1']] - xs[im['c0'] - 1] - 6
             bh = ys[im['r1']] - ys[im['r0'] - 1] - 6
-            w, h, dx, dy = fit_box(iw, ih, bw, bh)
+            w, h, dx, dy = fit_box2(iw, ih, bw, bh, im.get('fit') or 'contain')
             xi = XLImage(p)
             xi.width, xi.height = int(w), int(h)
             # vi tri: dat tai o goc + lech (dx,dy) de can giua khung
