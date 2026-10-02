@@ -16,6 +16,24 @@ Toàn bộ code do bạn sở hữu — chỉ dùng WinAPI chuẩn, không phụ
 Ngược lại, `trigger = present` sẽ nhấn phím khi màu **xuất hiện** (ví dụ chờ một
 icon/thông báo hiện ra).
 
+### Phím lặp theo chu kỳ (auto đánh / auto kỹ năng)
+
+Ngoài phần theo màu, tool còn có khối `[timer]`: **tự nhấn một phím lặp lại theo
+chu kỳ** — chính là kiểu "auto đánh thường" hoặc "tung kỹ năng" mà bot hay có.
+Mỗi `[timer]` có thể thêm `jitter_ms` để dao động chu kỳ ngẫu nhiên cho nhịp bấm
+tự nhiên hơn.
+
+```ini
+[timer]
+name = Attack
+key = 1
+interval_ms = 600     # nhấn phím "1" mỗi ~0.6 giây
+jitter_ms = 150       # dao động ngẫu nhiên +/- 0.15 giây
+```
+
+Bạn có thể khai báo nhiều `[timer]` cùng lúc (mỗi skill một timer) và chúng chạy
+song song với các `[monitor]` HP/MP. Tất cả đều bật/tắt chung bằng **F9**.
+
 ### Bám theo cửa sổ game (chống lệch khi di chuyển cửa sổ)
 
 Nếu bạn đặt `window_title` trong `[general]`, tool sẽ **tìm cửa sổ game theo tiêu
@@ -97,6 +115,15 @@ Mỗi `[monitor]` là một điểm theo dõi:
 | `poll_interval_ms` | Chu kỳ quét (ms). Nhỏ hơn = nhạy hơn, tốn CPU hơn |
 | `window_title` | Chuỗi con trong tiêu đề cửa sổ game. Có giá trị → `x,y` là tọa độ tương đối cửa sổ. Để trống → tọa độ màn hình tuyệt đối |
 | `capture_mode` | `screen` (mặc định) hoặc `window` — xem bảng ở trên |
+
+`[timer]` (phím lặp theo chu kỳ):
+
+| Khóa | Ý nghĩa |
+|------|---------|
+| `name` | Tên hiển thị trong log |
+| `key` | Phím sẽ nhấn (cùng danh sách phím như trên) |
+| `interval_ms` | Chu kỳ nhấn (ms) |
+| `jitter_ms` | Dao động ngẫu nhiên +/- quanh chu kỳ (ms). 0 = đều tăm tắp |
 
 ## Lưu ý
 

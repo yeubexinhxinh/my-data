@@ -146,6 +146,19 @@ struct PixelMonitor {
 };
 
 // ---------------------------------------------------------------------------
+// Cau truc mot "phim lap theo chu ky" (auto danh / auto ky nang)
+//   Cu moi interval_ms (co the +/- jitter_ms ngau nhien) thi nhan 1 lan phim.
+// ---------------------------------------------------------------------------
+struct TimerAction {
+    std::string name = "timer";    // ten de hien thi log
+    WORD vk = 0;                    // phim se nhan
+    std::string keyName = "";      // ten phim (de log)
+    int intervalMs = 1000;         // chu ky nhan (ms)
+    int jitterMs = 0;              // dao ngau nhien +/- (ms) cho tu nhien hon
+    DWORD nextFire = 0;           // thoi diem nhan ke tiep (noi bo)
+};
+
+// ---------------------------------------------------------------------------
 // Doc mau 1 pixel.
 //   hwnd == NULL                : (x,y) la toa do man hinh tuyet doi.
 //   hwnd hop le, useWindowDC=0  : (x,y) tuong doi vung client -> doi sang
@@ -198,6 +211,15 @@ static void sendKey(WORD vk) {
     SendInput(2, in, sizeof(INPUT));
 }
 
+// Tinh chu ky ke tiep cua mot timer (co dao ngau nhien +/- jitter)
+static DWORD nextInterval(const TimerAction& t) {
+    int j = 0;
+    if (t.jitterMs > 0) j = (rand() % (2 * t.jitterMs + 1)) - t.jitterMs;
+    int iv = t.intervalMs + j;
+    if (iv < 10) iv = 10;
+    return (DWORD)iv;
+}
+
 // ---------------------------------------------------------------------------
 // Doc file config.ini
 // Dinh dang moi dong trong 1 [monitor] la key=value.
@@ -209,6 +231,7 @@ struct AppConfig {
                                        // (de trong = dung toa do man hinh tuyet doi)
     bool useWindowDC = false;          // true = doc truc tiep tu DC cua so
     std::vector<PixelMonitor> monitors;
+    std::vector<TimerAction>  timers;
 };
 
 static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err) {
@@ -218,13 +241,19 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
         return false;
     }
 
-    PixelMonitor cur;
-    bool inMonitor = false;
+    enum Block { B_GENERAL, B_MONITOR, B_TIMER };
+    Block blk = B_GENERAL;
+    PixelMonitor curM;
+    TimerAction  curT;
 
+    // Luu lai block vua xong truoc khi chuyen sang block khac
     auto flush = [&]() {
-        if (inMonitor) {
-            cur.vk = keyNameToVk(cur.keyName);
-            cfg.monitors.push_back(cur);
+        if (blk == B_MONITOR) {
+            curM.vk = keyNameToVk(curM.keyName);
+            cfg.monitors.push_back(curM);
+        } else if (blk == B_TIMER) {
+            curT.vk = keyNameToVk(curT.keyName);
+            cfg.timers.push_back(curT);
         }
     };
 
@@ -233,18 +262,15 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == ';') continue;
 
-        // Bat dau mot block monitor moi
-        if (toUpper(line) == "[MONITOR]") {
-            flush();
-            cur = PixelMonitor();   // reset ve mac dinh
-            inMonitor = true;
-            continue;
+        std::string up = toUpper(line);
+        if (up == "[MONITOR]") {
+            flush(); curM = PixelMonitor(); blk = B_MONITOR; continue;
         }
-        // Block cai dat chung
-        if (toUpper(line) == "[GENERAL]") {
-            flush();
-            inMonitor = false;
-            continue;
+        if (up == "[TIMER]") {
+            flush(); curT = TimerAction(); blk = B_TIMER; continue;
+        }
+        if (up == "[GENERAL]") {
+            flush(); blk = B_GENERAL; continue;
         }
 
         size_t eq = line.find('=');
@@ -252,33 +278,41 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
         std::string key = toUpper(trim(line.substr(0, eq)));
         std::string val = trim(line.substr(eq + 1));
 
-        if (!inMonitor) {
-            // thuoc [GENERAL]
+        if (blk == B_GENERAL) {
             if      (key == "POLL_INTERVAL_MS") cfg.pollIntervalMs = atoi(val.c_str());
             else if (key == "WINDOW_TITLE")     cfg.windowTitle = val;
             else if (key == "CAPTURE_MODE")     cfg.useWindowDC = (toUpper(val) == "WINDOW");
-            continue;
         }
-
-        // thuoc [MONITOR]
-        if      (key == "NAME")        cur.name = val;
-        else if (key == "X")           cur.x = atoi(val.c_str());
-        else if (key == "Y")           cur.y = atoi(val.c_str());
-        else if (key == "R")           cur.r = atoi(val.c_str());
-        else if (key == "G")           cur.g = atoi(val.c_str());
-        else if (key == "B")           cur.b = atoi(val.c_str());
-        else if (key == "TOLERANCE")   cur.tolerance = atoi(val.c_str());
-        else if (key == "KEY")         cur.keyName = val;
-        else if (key == "TRIGGER")     cur.trigger = toUpper(val) == "PRESENT" ? "present" : "absent";
-        else if (key == "COOLDOWN_MS") cur.cooldownMs = atoi(val.c_str());
+        else if (blk == B_MONITOR) {
+            if      (key == "NAME")        curM.name = val;
+            else if (key == "X")           curM.x = atoi(val.c_str());
+            else if (key == "Y")           curM.y = atoi(val.c_str());
+            else if (key == "R")           curM.r = atoi(val.c_str());
+            else if (key == "G")           curM.g = atoi(val.c_str());
+            else if (key == "B")           curM.b = atoi(val.c_str());
+            else if (key == "TOLERANCE")   curM.tolerance = atoi(val.c_str());
+            else if (key == "KEY")         curM.keyName = val;
+            else if (key == "TRIGGER")     curM.trigger = toUpper(val) == "PRESENT" ? "present" : "absent";
+            else if (key == "COOLDOWN_MS") curM.cooldownMs = atoi(val.c_str());
+        }
+        else if (blk == B_TIMER) {
+            if      (key == "NAME")        curT.name = val;
+            else if (key == "KEY")         curT.keyName = val;
+            else if (key == "INTERVAL_MS") curT.intervalMs = atoi(val.c_str());
+            else if (key == "JITTER_MS")   curT.jitterMs = atoi(val.c_str());
+        }
     }
     flush();
 
-    if (cfg.monitors.empty()) {
-        err = "Config khong co diem theo doi nao ([monitor]).";
+    if (cfg.monitors.empty() && cfg.timers.empty()) {
+        err = "Config khong co [monitor] hay [timer] nao.";
         return false;
     }
     if (cfg.pollIntervalMs < 10) cfg.pollIntervalMs = 10;
+    for (auto& t : cfg.timers) {
+        if (t.intervalMs < 10) t.intervalMs = 10;
+        if (t.jitterMs < 0)    t.jitterMs = 0;
+    }
     return true;
 }
 
@@ -306,6 +340,7 @@ int main() {
 
     // Giup toa do GetPixel/ClientToScreen khop nhau khi Windows dang scale DPI.
     SetProcessDPIAware();
+    srand((unsigned)GetTickCount());   // seed cho jitter ngau nhien
 
     AppConfig cfg;
     std::string err;
@@ -326,6 +361,7 @@ int main() {
     std::cout << "============================================\n";
     std::cout << " AutoHelper da nap cau hinh thanh cong.\n";
     std::cout << " So diem theo doi : " << cfg.monitors.size() << "\n";
+    std::cout << " So phim chu ky   : " << cfg.timers.size() << "\n";
     std::cout << " Chu ky quet      : " << cfg.pollIntervalMs << " ms\n";
     if (cfg.windowTitle.empty()) {
         std::cout << " Che do toa do    : MAN HINH TUYET DOI\n";
@@ -343,6 +379,13 @@ int main() {
                   << "phim=" << m.keyName
                   << (m.vk == 0 ? " [!! phim khong hop le]" : "")
                   << " trigger=" << m.trigger << "\n";
+    }
+    for (const auto& t : cfg.timers) {
+        std::cout << "  ~ " << t.name << " phim=" << t.keyName
+                  << (t.vk == 0 ? " [!! phim khong hop le]" : "")
+                  << " moi " << t.intervalMs << "ms"
+                  << (t.jitterMs ? (" +/-" + std::to_string(t.jitterMs) + "ms") : "")
+                  << "\n";
     }
     std::cout << "============================================\n";
     std::cout << " F9  = Bat/Tat tu dong\n";
@@ -363,6 +406,11 @@ int main() {
         if (f9 && !prevF9) {
             running = !running;
             std::cout << " Trang thai: " << (running ? "BAT" : "TAT") << "\n";
+            if (running) {
+                // khi vua bat: lap lich cho cac timer (nhan ngay o chu ky dau)
+                DWORD now = GetTickCount();
+                for (auto& t : cfg.timers) t.nextFire = now;
+            }
         }
         if (f10 && !prevF10) {
             dumpColors(cfg, hwnd);
@@ -404,6 +452,19 @@ int main() {
                     m.lastFire = now;
                     std::cout << " [" << m.name << "] -> nhan phim "
                               << m.keyName << " (dist=" << dist << ")\n";
+                }
+            }
+
+            // --- Phim lap theo chu ky (auto danh / auto ky nang) ---
+            bool needWindow = !cfg.windowTitle.empty();
+            for (auto& t : cfg.timers) {
+                if (t.vk == 0) continue;               // phim khong hop le
+                if (needWindow && hwnd == NULL) continue; // chua co cua so
+                if ((long)(now - t.nextFire) >= 0) {
+                    sendKey(t.vk);
+                    t.nextFire = now + nextInterval(t);
+                    std::cout << " [" << t.name << "] ~ nhan phim "
+                              << t.keyName << "\n";
                 }
             }
         }
