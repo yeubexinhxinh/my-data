@@ -13,6 +13,12 @@
 //  Toan bo cau hinh nam trong file config.ini de ban tu chinh, khong can
 //  sua lai code.
 //
+//  BAM THEO CUA SO GAME:
+//    - Neu dat window_title trong config, toa do x,y cua moi monitor duoc hieu
+//      la TUONG DOI so voi goc tren-trai vung client cua cua so do.
+//    - Khi ban keo/di chuyen cua so, tool tu tinh lai vi tri -> khong bi lech.
+//    - De trong window_title => quay ve che do toa do man hinh tuyet doi (cu).
+//
 //  Phim dieu khien khi chay:
 //    F9  : Bat / tat che do tu dong (toggle)
 //    F10 : In ra mau pixel hien tai tai cac diem dang theo doi (de do mau)
@@ -87,6 +93,37 @@ static WORD keyNameToVk(const std::string& rawName) {
 }
 
 // ---------------------------------------------------------------------------
+// Tim cua so game theo chuoi con trong tieu de (khong phan biet hoa/thuong)
+// EnumWindows duyet moi cua so top-level dang hien thi.
+// ---------------------------------------------------------------------------
+static HWND        g_foundHwnd = NULL;
+static std::string g_titleNeedleUpper;
+
+static BOOL CALLBACK enumWindowProc(HWND h, LPARAM) {
+    if (!IsWindowVisible(h)) return TRUE;
+    char buf[512] = {0};
+    int len = GetWindowTextA(h, buf, (int)sizeof(buf) - 1);
+    if (len <= 0) return TRUE;
+    std::string title(buf);
+    // so khop chuoi con (title viet hoa)
+    std::string up = title;
+    std::transform(up.begin(), up.end(), up.begin(),
+                   [](unsigned char c) { return (char)std::toupper(c); });
+    if (up.find(g_titleNeedleUpper) != std::string::npos) {
+        g_foundHwnd = h;
+        return FALSE;   // dung duyet khi da tim thay
+    }
+    return TRUE;
+}
+
+static HWND findGameWindow(const std::string& needleUpper) {
+    g_foundHwnd = NULL;
+    g_titleNeedleUpper = needleUpper;
+    EnumWindows(enumWindowProc, 0);
+    return g_foundHwnd;
+}
+
+// ---------------------------------------------------------------------------
 // Cau truc mot "diem theo doi"
 // ---------------------------------------------------------------------------
 struct PixelMonitor {
@@ -109,9 +146,27 @@ struct PixelMonitor {
 };
 
 // ---------------------------------------------------------------------------
-// Doc mau 1 pixel tren toan man hinh
+// Doc mau 1 pixel.
+//   hwnd == NULL                : (x,y) la toa do man hinh tuyet doi.
+//   hwnd hop le, useWindowDC=0  : (x,y) tuong doi vung client -> doi sang
+//                                 toa do man hinh roi doc tu DC man hinh.
+//                                 (Cua so can hien ra, khong bi che.)
+//   hwnd hop le, useWindowDC=1  : doc truc tiep tu DC cua so tai (x,y) client.
+//                                 (Chay duoc ca khi cua so khong focus; nhung
+//                                  mot so game DirectX co the tra ve mau den.)
 // ---------------------------------------------------------------------------
-static COLORREF getPixelColor(int x, int y) {
+static COLORREF getPixelColor(HWND hwnd, bool useWindowDC, int x, int y) {
+    if (hwnd != NULL && useWindowDC) {
+        HDC hdc = GetDC(hwnd);
+        COLORREF c = GetPixel(hdc, x, y);
+        ReleaseDC(hwnd, hdc);
+        return c;
+    }
+    if (hwnd != NULL) {
+        POINT p = { x, y };
+        ClientToScreen(hwnd, &p);   // tuong doi client -> man hinh
+        x = p.x; y = p.y;
+    }
     HDC hdc = GetDC(NULL);          // DC cua toan man hinh
     COLORREF c = GetPixel(hdc, x, y);
     ReleaseDC(NULL, hdc);
@@ -150,6 +205,9 @@ static void sendKey(WORD vk) {
 // ---------------------------------------------------------------------------
 struct AppConfig {
     int pollIntervalMs = 100;          // chu ky quet (ms)
+    std::string windowTitle = "";      // chuoi con trong tieu de cua so game
+                                       // (de trong = dung toa do man hinh tuyet doi)
+    bool useWindowDC = false;          // true = doc truc tiep tu DC cua so
     std::vector<PixelMonitor> monitors;
 };
 
@@ -196,7 +254,9 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
 
         if (!inMonitor) {
             // thuoc [GENERAL]
-            if (key == "POLL_INTERVAL_MS") cfg.pollIntervalMs = atoi(val.c_str());
+            if      (key == "POLL_INTERVAL_MS") cfg.pollIntervalMs = atoi(val.c_str());
+            else if (key == "WINDOW_TITLE")     cfg.windowTitle = val;
+            else if (key == "CAPTURE_MODE")     cfg.useWindowDC = (toUpper(val) == "WINDOW");
             continue;
         }
 
@@ -225,10 +285,10 @@ static bool loadConfig(const std::string& path, AppConfig& cfg, std::string& err
 // ---------------------------------------------------------------------------
 // In ra mau hien tai tai cac diem (de ban do mau de dua vao config)
 // ---------------------------------------------------------------------------
-static void dumpColors(const AppConfig& cfg) {
+static void dumpColors(const AppConfig& cfg, HWND hwnd) {
     std::cout << "\n--- Mau pixel hien tai ---\n";
     for (const auto& m : cfg.monitors) {
-        COLORREF c = getPixelColor(m.x, m.y);
+        COLORREF c = getPixelColor(hwnd, cfg.useWindowDC, m.x, m.y);
         std::cout << "  [" << m.name << "] ("
                   << m.x << "," << m.y << ") = R:"
                   << (int)GetRValue(c) << " G:"
@@ -244,6 +304,9 @@ static void dumpColors(const AppConfig& cfg) {
 int main() {
     SetConsoleTitleA("AutoHelper - HP/MP pixel watcher");
 
+    // Giup toa do GetPixel/ClientToScreen khop nhau khi Windows dang scale DPI.
+    SetProcessDPIAware();
+
     AppConfig cfg;
     std::string err;
     if (!loadConfig("config.ini", cfg, err)) {
@@ -253,10 +316,25 @@ int main() {
         return 1;
     }
 
+    // Tim cua so game (neu co cau hinh window_title)
+    std::string needleUpper = toUpper(cfg.windowTitle);
+    HWND hwnd = NULL;
+    if (!cfg.windowTitle.empty()) {
+        hwnd = findGameWindow(needleUpper);
+    }
+
     std::cout << "============================================\n";
     std::cout << " AutoHelper da nap cau hinh thanh cong.\n";
     std::cout << " So diem theo doi : " << cfg.monitors.size() << "\n";
     std::cout << " Chu ky quet      : " << cfg.pollIntervalMs << " ms\n";
+    if (cfg.windowTitle.empty()) {
+        std::cout << " Che do toa do    : MAN HINH TUYET DOI\n";
+    } else {
+        std::cout << " Bam cua so       : \"" << cfg.windowTitle << "\""
+                  << (cfg.useWindowDC ? " (doc tu DC cua so)" : " (doc tu man hinh)") << "\n";
+        std::cout << " Trang thai cua so: "
+                  << (hwnd ? "DA TIM THAY" : "CHUA THAY (se tu tim lai khi chay)") << "\n";
+    }
     std::cout << "--------------------------------------------\n";
     for (const auto& m : cfg.monitors) {
         std::cout << "  * " << m.name << " @(" << m.x << "," << m.y << ") "
@@ -287,7 +365,7 @@ int main() {
             std::cout << " Trang thai: " << (running ? "BAT" : "TAT") << "\n";
         }
         if (f10 && !prevF10) {
-            dumpColors(cfg);
+            dumpColors(cfg, hwnd);
         }
         if (f12 && !prevF12) {
             std::cout << " Thoat chuong trinh.\n";
@@ -297,11 +375,22 @@ int main() {
 
         // --- Neu dang bat, quet cac diem theo doi ---
         if (running) {
+            // Neu bam theo cua so: dam bao handle con hop le, neu khong thi tim lai.
+            if (!cfg.windowTitle.empty() && (hwnd == NULL || !IsWindow(hwnd))) {
+                HWND re = findGameWindow(needleUpper);
+                if (re != hwnd) {
+                    hwnd = re;
+                    std::cout << (hwnd ? " [cua so] da tim thay lai.\n"
+                                       : " [cua so] khong thay, dang cho...\n");
+                }
+            }
+
             DWORD now = GetTickCount();
             for (auto& m : cfg.monitors) {
                 if (m.vk == 0) continue;  // bo qua phim khong hop le
+                if (!cfg.windowTitle.empty() && hwnd == NULL) continue; // chua co cua so
 
-                COLORREF c = getPixelColor(m.x, m.y);
+                COLORREF c = getPixelColor(hwnd, cfg.useWindowDC, m.x, m.y);
                 int dist = colorDistance(GetRValue(c), GetGValue(c), GetBValue(c),
                                          m.r, m.g, m.b);
                 bool matches = (dist <= m.tolerance);

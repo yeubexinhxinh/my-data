@@ -16,6 +16,27 @@ Toàn bộ code do bạn sở hữu — chỉ dùng WinAPI chuẩn, không phụ
 Ngược lại, `trigger = present` sẽ nhấn phím khi màu **xuất hiện** (ví dụ chờ một
 icon/thông báo hiện ra).
 
+### Bám theo cửa sổ game (chống lệch khi di chuyển cửa sổ)
+
+Nếu bạn đặt `window_title` trong `[general]`, tool sẽ **tìm cửa sổ game theo tiêu
+đề** và hiểu `x`, `y` của mỗi `[monitor]` là **tọa độ tương đối so với góc
+trên-trái vùng client của cửa sổ**. Khi bạn kéo/di chuyển cửa sổ, tool tự tính
+lại vị trí thật nên **không bị lệch**. Nếu cửa sổ tạm biến mất (minimize/đóng),
+tool tự tìm lại khi cửa sổ xuất hiện trở lại.
+
+Để trống `window_title` → quay về chế độ tọa độ màn hình tuyệt đối như cũ.
+
+Hai chế độ đọc màu (`capture_mode`):
+
+| Giá trị | Mô tả |
+|---------|-------|
+| `screen` | Tính tọa độ client → đổi sang tọa độ màn hình rồi đọc. **Cần cửa sổ hiện ra, không bị che.** (mặc định, hợp nhất) |
+| `window` | Đọc trực tiếp từ DC của cửa sổ. Chạy được cả khi cửa sổ không focus, nhưng một số game DirectX có thể trả về màu đen — khi đó hãy dùng `screen`. |
+
+> Mẹo lấy tọa độ tương đối cửa sổ: đặt `window_title`, chạy tool, rồi dùng `F10`
+> để in màu. Nếu màu không đúng điểm mong muốn, chỉnh `x`, `y` (tính từ mép trong
+> trái-trên của cửa sổ game, không phải mép màn hình).
+
 ## Build
 
 Cần **Visual Studio Build Tools** (có `cl`) hoặc **MinGW-w64** (có `g++`).
@@ -69,7 +90,13 @@ Mỗi `[monitor]` là một điểm theo dõi:
 | `trigger` | `absent` = nhấn khi màu **mất** (HP/MP tụt); `present` = nhấn khi màu **xuất hiện** |
 | `cooldown_ms` | Thời gian chờ tối thiểu giữa 2 lần nhấn (ms) |
 
-`[general]` → `poll_interval_ms`: chu kỳ quét (ms). Nhỏ hơn = nhạy hơn, tốn CPU hơn.
+`[general]`:
+
+| Khóa | Ý nghĩa |
+|------|---------|
+| `poll_interval_ms` | Chu kỳ quét (ms). Nhỏ hơn = nhạy hơn, tốn CPU hơn |
+| `window_title` | Chuỗi con trong tiêu đề cửa sổ game. Có giá trị → `x,y` là tọa độ tương đối cửa sổ. Để trống → tọa độ màn hình tuyệt đối |
+| `capture_mode` | `screen` (mặc định) hoặc `window` — xem bảng ở trên |
 
 ## Lưu ý
 
