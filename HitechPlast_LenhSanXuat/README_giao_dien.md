@@ -264,3 +264,16 @@ Cửa sổ **"👁 Xem trước tem"** nay có thêm:
 
 Dùng chung `tem_khogiay.py` (thêm `save_label_pdf`, `is_a5`). Chép đè `tem_ui.py`
 và `tem_khogiay.py`.
+
+---
+
+## Cập nhật thêm (đợt 14) — Xem trước tem: thêm Xuất Excel + Xuất Word
+
+Cửa sổ "👁 Xem trước tem" nay có đủ: **📄 Xuất PDF · 📊 Xuất Excel · 📝 Xuất Word**
+(và 🖨 ×2 tem A5 khi khổ A5). Ảnh tem được nhúng ĐÚNG kích thước tem.
+
+- Excel (.xlsx): dùng openpyxl (có sẵn).
+- Word (.docx): dùng python-docx — **nếu chưa cài** sẽ báo "pip install python-docx".
+
+Hàm trong `tem_khogiay.py`: `save_label_excel`, `save_label_word`.
+Chép đè `tem_ui.py` và `tem_khogiay.py`. Word cần: `pip install python-docx`.

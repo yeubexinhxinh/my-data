@@ -888,9 +888,13 @@ class PreviewWindow(tk.Toplevel):
         if on_export:
             tk.Button(bt, text='💾 Xuất .btw', bg='#0068ff', fg='white', relief='flat', font=FONT_B, padx=14,
                       command=lambda: (self.destroy(), on_export())).pack(side='right', padx=4)
-        # Xuat PDF (1 tem dung kich thuoc)
+        # Xuat PDF / Excel / Word (1 tem dung kich thuoc)
         tk.Button(bt, text='📄 Xuất PDF', bg='#b0413e', fg='white', relief='flat', font=FONT_B, padx=12,
                   command=self._export_pdf).pack(side='right', padx=4)
+        tk.Button(bt, text='📊 Xuất Excel', bg='#1e7145', fg='white', relief='flat', font=FONT_B, padx=12,
+                  command=self._export_excel).pack(side='right', padx=4)
+        tk.Button(bt, text='📝 Xuất Word', bg='#2b579a', fg='white', relief='flat', font=FONT_B, padx=12,
+                  command=self._export_word).pack(side='right', padx=4)
         # Neu dang chon A5: them nut xuat 2 tem + duong ke giua
         try:
             import tem_khogiay as _TK
@@ -939,6 +943,40 @@ class PreviewWindow(tk.Toplevel):
             TK.export_page(self.img, p, paper='A5', two_up=True, cut_line=True)
         except Exception as e:
             messagebox.showerror('Lỗi xuất PDF', str(e), parent=self)
+            return
+        try:
+            _open_path(p)
+        except Exception:
+            pass
+
+    def _export_excel(self):
+        """Xuất 1 tem ra file Excel (.xlsx)."""
+        import tem_khogiay as TK
+        p = filedialog.asksaveasfilename(parent=self, defaultextension='.xlsx',
+                                         filetypes=[('Excel', '*.xlsx')], initialfile='Tem.xlsx')
+        if not p:
+            return
+        try:
+            TK.save_label_excel(self.img, p, self.size_mm)
+        except Exception as e:
+            messagebox.showerror('Lỗi xuất Excel', str(e), parent=self)
+            return
+        try:
+            _open_path(p)
+        except Exception:
+            pass
+
+    def _export_word(self):
+        """Xuất 1 tem ra file Word (.docx). Cần python-docx."""
+        import tem_khogiay as TK
+        p = filedialog.asksaveasfilename(parent=self, defaultextension='.docx',
+                                         filetypes=[('Word', '*.docx')], initialfile='Tem.docx')
+        if not p:
+            return
+        try:
+            TK.save_label_word(self.img, p, self.size_mm)
+        except Exception as e:
+            messagebox.showerror('Lỗi xuất Word', str(e), parent=self)
             return
         try:
             _open_path(p)

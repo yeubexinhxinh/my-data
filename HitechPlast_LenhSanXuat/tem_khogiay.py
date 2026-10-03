@@ -121,6 +121,63 @@ def save_label_pdf(label_img, path, size_mm, dpi=300):
     return path
 
 
+def save_label_excel(label_img, path, size_mm, dpi=200):
+    """Xuất 1 tem vào file Excel (.xlsx) - ảnh đúng kích thước tem."""
+    import os
+    import tempfile
+    import openpyxl
+    from openpyxl.drawing.image import Image as XLImage
+    from PIL import Image
+    w_mm, h_mm = size_mm
+    W = max(1, int(round(w_mm / 25.4 * dpi)))
+    H = max(1, int(round(h_mm / 25.4 * dpi)))
+    im = label_img.convert('RGB').resize((W, H), Image.LANCZOS)
+    tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+    tmp.close()
+    im.save(tmp.name)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Tem'
+    xi = XLImage(tmp.name)
+    xi.width, xi.height = W, H
+    ws.add_image(xi, 'A1')
+    wb.save(path)
+    try:
+        os.remove(tmp.name)
+    except OSError:
+        pass
+    return path
+
+
+def save_label_word(label_img, path, size_mm):
+    """Xuất 1 tem vào file Word (.docx) - ảnh rộng đúng bằng tem. Cần python-docx."""
+    try:
+        import docx
+        from docx.shared import Mm
+    except Exception:
+        raise RuntimeError("Chưa cài thư viện Word.\nChạy: pip install python-docx")
+    import os
+    import tempfile
+    w_mm, h_mm = size_mm
+    tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+    tmp.close()
+    label_img.convert('RGB').save(tmp.name)
+    doc = docx.Document()
+    sec = doc.sections[0]
+    try:
+        sec.left_margin = sec.right_margin = Mm(5)
+        sec.top_margin = sec.bottom_margin = Mm(5)
+    except Exception:
+        pass
+    doc.add_picture(tmp.name, width=Mm(w_mm))
+    doc.save(path)
+    try:
+        os.remove(tmp.name)
+    except OSError:
+        pass
+    return path
+
+
 def is_a5(size_mm, tol=3.0):
     """size_mm có phải khổ A5 (148x210) không, kể cả xoay ngang."""
     w, h = size_mm
