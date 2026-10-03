@@ -367,3 +367,18 @@ nối vào hộp thoại ảnh và lúc khởi động. Chép đè `app_hitechpl
 > Lưu ý: cấu hình được chia sẻ gồm đường dẫn thư mục + chế độ nguồn ảnh. Nếu các
 > máy có ổ đĩa khác nhau (C:\ vs D:\), nên dùng đường dẫn ổ mạng chung
 > (\\MAY-CHU\...) để mọi máy mở được, hoặc để chế độ MÁY CHỦ (ảnh lấy từ database).
+
+---
+
+## Cập nhật thêm (đợt 20) — "Ảnh trên máy chủ (0)": chưa tải lên + sửa quét thư mục
+
+"Ảnh trên máy chủ (0)" = database máy chủ CHƯA có ảnh nào. Đặt đường dẫn thư mục
+thôi CHƯA đủ — phải bấm **"⬆ Tải thư mục Tem lên máy chủ"** (và Bao bì) để đẩy ảnh
+từ thư mục vào database; mọi máy mới thấy.
+
+Ngoài ra sửa `scan_folder` (image_sync.py): trước chỉ quét ảnh trong **thư mục con
+`<Mã KH>`**; nếu ảnh để **thẳng trong thư mục gốc** thì tải lên = 0. Nay nhận CẢ 2:
+- `<thư mục>\<Mã KH>\*.png`  (như cũ), và
+- `<thư mục>\*.png` (ảnh để thẳng gốc → tự suy Mã KH từ tên file, vd `KSP-...png` → `KSP`).
+
+Chép đè `image_sync.py`.
