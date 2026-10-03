@@ -7540,40 +7540,17 @@ class App(tk.Tk):
             self._offline_msg(f'⚠ Chưa chuyển được về máy chính ({str(report)[:80]}) – thử lại sau', '#ffb4a9')
             self.after(standby.CHECK_MAIN_SEC * 2000, self._standby_tick)
             return
-        try:                                            # dung nhip tim / tin nhan tren du phong
-            import presence
-            presence.stop()
-        except Exception:
-            pass
+        # Chuyen ve may chu CHINH NGAY TAI CHO - KHONG thoat / khoi dong lai app.
+        self._switch_store_live(main_st)                # doi ket noi + nap lai du lieu + presence/tin nhan
+        if self.lbl_sync is not None:
+            self.lbl_sync.config(text=f'✔ Đã về máy chủ chính lúc {time.strftime("%H:%M:%S")}', fg='#8fd694')
+            self._last_auto = time.time()
         try:
-            import messenger
-            messenger.stop()
+            print('standby: da ve may chinh -', standby.report_text(report))
         except Exception:
             pass
-        old = datastore.server()
-        datastore.go_online(main_st)
-        try:
-            if old is not None and old is not main_st:
-                old.c.close()
-        except Exception:
-            pass
-        try:
-            import qc_app
-            if qc_app.STORE is not None:
-                qc_app.STORE.con = datastore.qc_connection()
-                qc_app.STORE.cache.clear()
-                qc_app.STORE.idx_cache.clear()
-                qc_app.STORE.ver += 1
-        except Exception:
-            pass
-        try:
-            load_store()
-        except Exception:
-            pass
-        messagebox.showinfo('Đã chuyển về máy chủ chính',
-                            'Máy chủ CHÍNH đã bật – phần mềm chuyển về máy chủ chính.\n\n'
-                            + standby.report_text(report) + '\n\nBấm OK để mở lại dữ liệu.', parent=self)
-        self.restart()
+        # tiep tuc theo doi: nay dang o may chinh -> giu du phong moi nhat (mirror dinh ky)
+        self.after(standby.MIRROR_EVERY_SEC * 1000, self._standby_tick)
 
     def destroy(self):
         try:                                        # dong phan mem: cap nhat ban sao offline (sheet / don hang)
@@ -7863,33 +7840,10 @@ class App(tk.Tk):
     def _apply_reconnect(self, st):
         """Thay ServerStore dang dung bang ket noi moi (chinh hoac du phong) ngay tai cho."""
         import datastore
-        old = datastore.server()
-        if old is st:
+        if datastore.server() is st:
             return
-        try:
-            st.who = datastore._WHO
-        except Exception:
-            pass
-        datastore.go_online(st)            # _SERVER = st, mode = 'server' (giu nguyen che do may chu)
-        try:
-            if old is not None and old is not st:
-                old.c.close()
-        except Exception:
-            pass
-        try:                               # lam moi ket noi + cache QC
-            import qc_app
-            if qc_app.STORE is not None:
-                qc_app.STORE.con = datastore.qc_connection()
-                qc_app.STORE.cache.clear()
-                qc_app.STORE.idx_cache.clear()
-                qc_app.STORE.ver += 1
-        except Exception:
-            pass
-        try:
-            load_store()                   # nap lai sheets / don hang tu may chu moi
-        except Exception:
-            pass
         on_bk = bool(getattr(st, 'cfg', {}).get('is_backup'))
+        self._switch_store_live(st)        # doi ket noi + nap lai du lieu + presence/tin nhan NGAY TAI CHO
         if self.lbl_sync is not None:
             if on_bk:
                 self.lbl_sync.config(
@@ -7901,6 +7855,58 @@ class App(tk.Tk):
         if on_bk and not getattr(self, '_sb_started', False):
             self._sb_started = True        # bat nhip standby de tu failback khi may chinh bat lai
             self.after(4000, self._standby_tick)
+
+    def _restart_presence_msg(self):
+        """Bat lai nhip 'may dang dung' (presence) + tin nhan (messenger) tro vao may chu dang dung."""
+        u = getattr(self, 'user', {}) or {}
+        try:
+            import presence
+            presence.stop()
+            presence.start(u.get('hoten') or u.get('username'), username=u.get('username') or '')
+        except Exception:
+            pass
+        try:
+            import messenger
+            messenger.stop()
+            messenger.start(datastore.server().cfg, u.get('username') or '', u.get('hoten') or '')
+        except Exception:
+            pass
+
+    def _switch_store_live(self, st):
+        """Doi ServerStore dang dung sang `st` va nap lai du lieu + nhip presence/tin nhan NGAY TAI CHO,
+        KHONG thoat / khoi dong lai app. Dung chung cho failover (chinh->du phong) va failback (du phong->chinh)."""
+        import datastore
+        old = datastore.server()
+        if old is st:
+            return
+        try:
+            st.who = datastore._WHO
+        except Exception:
+            pass
+        try:                               # giu moc 'ban may chu da biet' -> nhan dung sheet CHUA LUU, tranh hoi nham
+            base = getattr(old, '_sheet_base', None)
+            if base:
+                st._sheet_base = dict(base)
+        except Exception:
+            pass
+        datastore.go_online(st)            # _SERVER = st, mode = 'server'
+        try:
+            if old is not None and old is not st:
+                old.c.close()
+        except Exception:
+            pass
+        try:                               # QC tro sang ket noi moi
+            import qc_app
+            if qc_app.STORE is not None:
+                qc_app.STORE.con = datastore.qc_connection()
+        except Exception:
+            pass
+        try:
+            # carried-over _sheet_base -> nhan dung sheet CHUA LUU; chi hoi khi that su co thay doi chua luu
+            self._reload_live(datastore.server())   # nap lai sheets + don hang + QC, ve lai cac tab
+        except Exception:
+            pass
+        self._restart_presence_msg()       # bat lai nhip may dang dung + tin nhan tren may chu moi
 
     def _sync_msg_kept(self):
         """Giu dong 'Da tu cap nhat luc ...' khoang 1 phut roi moi tro ve ten may chu."""
