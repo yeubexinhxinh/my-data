@@ -917,11 +917,12 @@ import btw_design as D
 
 
 class DesignTab(tk.Frame):
-    def __init__(self, master, fill_tab, base_dir=None):
+    def __init__(self, master, fill_tab, base_dir=None, lib_name='tem_designs.json', kind=''):
         super().__init__(master, bg='#f4f6f9')
         self.fill = fill_tab                     # dung chung thu muc luu + mau phoi
         self.base = base_dir or _app_dir()
-        self.lib_path = os.path.join(self.base, 'tem_designs.json')
+        self.kind = kind                         # '' = tem bao, 'pallet' = tem pallet
+        self.lib_path = os.path.join(self.base, lib_name)
         self.lib = self._load_lib()
         self.d = D.normalize(self.lib[0] if self.lib else D.new_design())
         self.sel = None
@@ -1452,11 +1453,17 @@ class TemTab(tk.Frame):
         nb.pack(fill='both', expand=True, padx=4, pady=4)
         self.fill_tab = FillTab(nb, app=app, base_dir=base_dir)
         nb.add(self.fill_tab, text=' 📋 Điền tem theo mẫu (.btw) ')
-        self.design_tab = DesignTab(nb, self.fill_tab, base_dir=base_dir)
-        nb.add(self.design_tab, text=' 🎨 Tạo mẫu tem mới từ ảnh (chọn kích thước) ')
+        # Tem BAO (thư viện tem_designs.json)
+        self.design_tab = DesignTab(nb, self.fill_tab, base_dir=base_dir,
+                                    lib_name='tem_designs.json', kind='bao')
+        nb.add(self.design_tab, text=' 🎨 Tạo Mẫu Tem Bao Từ Ảnh ')
+        # Tem PALLET (thư viện riêng tem_designs_pallet.json)
+        self.design_pallet = DesignTab(nb, self.fill_tab, base_dir=base_dir,
+                                       lib_name='tem_designs_pallet.json', kind='pallet')
+        nb.add(self.design_pallet, text=' 📦 Tạo Mẫu Tem Pallet Từ Ảnh ')
         self.nb = nb
 
     def __getattr__(self, k):
-        if k in ('fill_tab', 'design_tab', 'nb'):
+        if k in ('fill_tab', 'design_tab', 'design_pallet', 'nb'):
             raise AttributeError(k)
         return getattr(self.fill_tab, k)

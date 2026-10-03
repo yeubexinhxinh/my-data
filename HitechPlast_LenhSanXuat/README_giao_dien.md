@@ -195,3 +195,20 @@ Bấm nút → hộp thoại chọn **khổ giấy A3 / A4 / A5** (chuẩn ISO),
 File mới: `tem_khogiay.py` (lõi ghép khổ giấy, không phụ thuộc giao diện — đã test
 xuất PDF A3/A4/A5 và kiểm tra A5 có đủ 2 tem + đường giữa). Chép file này cùng
 `tem_ui.py` vào thư mục phần mềm. Cần `pip install pillow`.
+
+---
+
+## Cập nhật thêm (đợt 10) — Tách 2 mục tạo mẫu tem: Bao / Pallet
+
+Trong "Làm Tem Nhanh" giờ có 3 tab:
+- **📋 Điền tem theo mẫu (.btw)** (như cũ)
+- **🎨 Tạo Mẫu Tem Bao Từ Ảnh** (đổi tên từ "Tạo mẫu tem mới từ ảnh") — thư viện
+  mẫu lưu ở `tem_designs.json`.
+- **📦 Tạo Mẫu Tem Pallet Từ Ảnh** (MỚI) — giống hệt cách làm, nhưng **thư viện
+  mẫu riêng** ở `tem_designs_pallet.json` để mẫu tem bao và tem pallet không lẫn.
+
+Cả 2 tab tạo mẫu đều có đủ: nhận diện khung từ ảnh, chọn kích thước, Xem trước,
+Xuất .btw, Lưu PNG và **🖨 Khổ giấy A3/A4/A5** (A5 = 2 tem + đường cắt giữa).
+
+Chép đè `tem_ui.py`. File `tem_designs_pallet.json` sẽ tự tạo khi bạn lưu mẫu
+pallet đầu tiên.
