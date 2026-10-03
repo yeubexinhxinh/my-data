@@ -1599,8 +1599,13 @@ class DesignTab(tk.Frame):
     def export(self):
         errs = D.check_limits(self.d)
         if errs:
-            messagebox.showwarning('Xuất .btw',
-                                   '\n'.join(errs) + self._donor_hint(), parent=self)
+            # Phoi .btw khong du o -> de nghi xuat PDF (khong gioi han so dong)
+            if messagebox.askyesno(
+                    'Xuất .btw',
+                    '\n'.join(errs) + self._donor_hint()
+                    + '\n\n➡ Xuất ra PDF (A3/A4/A5, không giới hạn số dòng) thay cho .btw?',
+                    parent=self):
+                self.export_paper()
             return
         d = self._outdir()
         nm = self.v_name.get().strip() or self.d.get('name') or 'MAU'
@@ -1612,7 +1617,11 @@ class DesignTab(tk.Frame):
         try:
             out, data = D.export_design(self.d, self._donor(), path)
         except Exception as ex:
-            messagebox.showerror('Xuất .btw', str(ex) + self._donor_hint(), parent=self)
+            if messagebox.askyesno('Xuất .btw',
+                                   str(ex) + self._donor_hint()
+                                   + '\n\n➡ Xuất ra PDF (không giới hạn số dòng) thay cho .btw?',
+                                   parent=self):
+                self.export_paper()
             return
         self.fill.last_out = out
         self.fill.btn_bt.configure(state='normal')

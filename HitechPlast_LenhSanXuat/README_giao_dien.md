@@ -301,3 +301,18 @@ Khắc phục (đã thêm):
   hạn số dòng).
 
 Chép đè `tem_ui.py`.
+
+---
+
+## Cập nhật thêm (đợt 16) — Xuất .btw vượt giới hạn phôi → tự đề nghị xuất PDF
+
+Vì sao tem pallet (19 dòng) báo lỗi khi Xuất .btw: file .btw tạo ra bằng cách
+ĐIỀN vào phôi có sẵn; BarTender .btw **không thể tự thêm ô chữ/đối tượng** qua
+công cụ này, nên số dòng tối đa = số ô chữ của phôi (phôi mặc định tem bao = 17 ô).
+Tem pallet 9 hàng × 2 cột = 18–19 ô → vượt.
+
+Nay khi bấm **Xuất .btw** mà vượt giới hạn phôi, phần mềm **hỏi và tự chuyển sang
+Xuất PDF** (A3/A4/A5, không giới hạn số dòng) để luôn ra được file. Vẫn giữ nút
+"Chọn phôi .btw…" nếu bạn có phôi tem pallet đủ ô.
+
+Chép đè `tem_ui.py`.
