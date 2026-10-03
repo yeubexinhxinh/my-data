@@ -177,3 +177,21 @@ Hai cột **"Độ trắng"** và **"Độ sáng"** được chèn **ngay sau c�
 > phần mềm tự dùng 2 cột này làm **tiêu chuẩn tự đối chiếu** trong báo cáo QC
 > (như MFI/% Tro), báo tôi để thêm vào bộ nhận diện chỉ tiêu (RM_KEYS/BB_UP_COLS
 > trong qc_app.py).
+
+---
+
+## Cập nhật thêm (đợt 9) — Xuất tem theo khổ giấy A3/A4/A5 (A5 = 2 tem + đường cắt)
+
+Thêm nút **"🖨 Khổ giấy A3/A4/A5"** ở cả 2 tab của "Làm Tem Nhanh":
+"📋 Điền tem theo mẫu" và "🎨 Tạo mẫu tem mới từ ảnh".
+
+Bấm nút → hộp thoại chọn **khổ giấy A3 / A4 / A5** (chuẩn ISO), định dạng **PDF**
+(in trực tiếp) hoặc **PNG**:
+- **A3 / A4**: 1 tem/trang, căn giữa, phóng vừa khổ (giữ tỉ lệ, tự xoay nếu vừa hơn).
+- **A5** (mặc định bật **"2 tem/trang"**): xếp **2 tem** trên 1 trang và **kẻ 1
+  đường (nét đứt) ở giữa** để cắt → ra 2 tem bằng nhau. Có thể bật/tắt 2 tem và
+  đường cắt tuỳ ý cho mọi khổ.
+
+File mới: `tem_khogiay.py` (lõi ghép khổ giấy, không phụ thuộc giao diện — đã test
+xuất PDF A3/A4/A5 và kiểm tra A5 có đủ 2 tem + đường giữa). Chép file này cùng
+`tem_ui.py` vào thư mục phần mềm. Cần `pip install pillow`.
