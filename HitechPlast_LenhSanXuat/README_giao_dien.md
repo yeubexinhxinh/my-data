@@ -277,3 +277,27 @@ Cửa sổ "👁 Xem trước tem" nay có đủ: **📄 Xuất PDF · 📊 Xu�
 
 Hàm trong `tem_khogiay.py`: `save_label_excel`, `save_label_word`.
 Chép đè `tem_ui.py` và `tem_khogiay.py`. Word cần: `pip install python-docx`.
+
+---
+
+## Cập nhật thêm (đợt 15)
+
+### 1) Thêm "Lưu vào" (thư mục) cho CẢ 2 tab tạo mẫu (Bao & Pallet)
+Mỗi tab có hàng **"Lưu vào: [đường dẫn] [...] [📂 Mở thư mục]"** riêng (lưu trong
+`tem_design_cfg.json` theo từng loại). Các nút Xuất .btw / PNG / Khổ giấy dùng
+đúng thư mục này. Để trống thì về thư mục mặc định như cũ.
+
+### 2) Vì sao xuất tem Pallet ra .btw không được — và cách khắc phục
+Nguyên nhân: file .btw được dựng bằng cách ĐIỀN NỘI DUNG vào **phôi có sẵn**
+(`tem_mau_AA06.btw` = tem BAO, chỉ có **17 ô chữ, 11 đường kẻ**). Tem pallet
+thường 9 hàng × 2 cột = **18 ô chữ** → vượt số ô của phôi → báo lỗi "phôi không
+đủ đối tượng", không xuất được.
+
+Khắc phục (đã thêm):
+- Mỗi tab có nút **"Chọn phôi .btw…"** — với tab Pallet, hãy chọn **phôi tem
+  pallet có đủ số dòng** (vd `TEM PALLET PA.btw`). Khi đó xuất .btw chạy đúng.
+- Nếu vẫn dùng phôi mặc định mà tem quá nhiều dòng, thông báo lỗi nay **nói rõ**
+  cách xử lý (chọn phôi pallet, hoặc dùng 📄 PDF / 📊 Excel / 📝 Word — không giới
+  hạn số dòng).
+
+Chép đè `tem_ui.py`.

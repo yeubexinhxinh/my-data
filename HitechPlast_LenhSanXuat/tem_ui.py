@@ -1168,6 +1168,20 @@ class DesignTab(tk.Frame):
         self.lbl_use.pack(anchor='w')
         body.add(pf, minsize=260)
 
+        # --- thu muc luu + phoi .btw (cho ca 2 tab tao mau)
+        ob = tk.Frame(self, bg='#f4f6f9')
+        ob.pack(fill='x', padx=8, pady=(2, 0))
+        tk.Label(ob, text='Lưu vào:', bg='#f4f6f9', font=FONT).pack(side='left')
+        self.v_out = tk.StringVar(value=self._load_out_dir())
+        ttk.Entry(ob, textvariable=self.v_out, width=44).pack(side='left', padx=4)
+        ttk.Button(ob, text='…', width=3, command=self.pick_out).pack(side='left')
+        ttk.Button(ob, text='📂 Mở thư mục', command=lambda: _open_path(self._outdir())).pack(side='left', padx=4)
+        tk.Label(ob, text='   Phôi .btw:', bg='#f4f6f9', font=FONT).pack(side='left')
+        self._donor_path = self._load_donor()
+        self.v_donor = tk.StringVar(value=(os.path.basename(self._donor_path) if self._donor_path else '(mặc định)'))
+        tk.Label(ob, textvariable=self.v_donor, bg='#f4f6f9', fg='#1f6f3f', font=FONT).pack(side='left')
+        ttk.Button(ob, text='Chọn phôi .btw…', command=self.pick_donor).pack(side='left', padx=4)
+
         bt = tk.Frame(self, bg='#f4f6f9')
         bt.pack(fill='x', padx=8, pady=(2, 2))
         tk.Label(bt, text='Tên mẫu:', bg='#f4f6f9', font=FONT).pack(side='left')
@@ -1486,18 +1500,109 @@ class DesignTab(tk.Frame):
         PreviewWindow(self, img, self.d.get('name') or 'mẫu mới', (self.d['w_mm'], self.d['h_mm']),
                       on_export=self.export, on_png=self.save_png)
 
+    # ------------------------------------------------------------ thu muc luu + phoi .btw
+    def _cfg2_path(self):
+        return os.path.join(self.base, 'tem_design_cfg.json')
+
+    def _cfg2(self):
+        try:
+            with open(self._cfg2_path(), encoding='utf-8') as f:
+                return json.load(f) or {}
+        except Exception:
+            return {}
+
+    def _cfg2_set(self, key, val):
+        cfg = self._cfg2()
+        cfg.setdefault(self.kind or 'bao', {})[key] = val
+        try:
+            with open(self._cfg2_path(), 'w', encoding='utf-8') as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=1)
+        except Exception:
+            pass
+
+    def _load_out_dir(self):
+        d = (self._cfg2().get(self.kind or 'bao', {}) or {}).get('out', '')
+        if d and os.path.isdir(d):
+            return d
+        try:
+            return self.fill._outdir()
+        except Exception:
+            return os.path.join(self.base, 'TemBTW')
+
+    def _save_out_dir(self, d):
+        self._cfg2_set('out', d)
+
+    def _load_donor(self):
+        p = (self._cfg2().get(self.kind or 'bao', {}) or {}).get('donor', '')
+        return p if (p and os.path.exists(p)) else ''
+
+    def _save_donor(self, p):
+        self._cfg2_set('donor', p)
+
+    def _outdir(self):
+        d = (self.v_out.get() or '').strip() if hasattr(self, 'v_out') else ''
+        if d:
+            try:
+                os.makedirs(d, exist_ok=True)
+                return d
+            except Exception:
+                pass
+        try:
+            return self.fill._outdir()
+        except Exception:
+            return os.path.join(self.base, 'TemBTW')
+
+    def pick_out(self):
+        init = self._outdir()
+        d = filedialog.askdirectory(parent=self, initialdir=init, title='Chọn thư mục lưu tem')
+        if not d:
+            return
+        d = os.path.normpath(d)
+        try:
+            os.makedirs(d, exist_ok=True)
+        except Exception:
+            messagebox.showerror('Lưu vào', 'Không ghi được vào thư mục:\n%s' % d, parent=self)
+            return
+        self.v_out.set(d)
+        self._save_out_dir(d)
+        self._st('✔ Thư mục lưu tem: %s' % d)
+
+    def pick_donor(self):
+        p = filedialog.askopenfilename(parent=self, title='Chọn phôi .btw (đủ số dòng cho tem này)',
+                                       filetypes=[('BarTender', '*.btw')], initialdir=self._outdir())
+        if not p:
+            return
+        self._donor_path = p
+        self._save_donor(p)
+        self.v_donor.set(os.path.basename(p))
+        self._st('✔ Phôi .btw: %s' % os.path.basename(p))
+
     def _donor(self):
+        p = getattr(self, '_donor_path', '') or ''
+        if p and os.path.exists(p):
+            return p
         p = _resource(DEFAULT_TPL)
         if not os.path.exists(p):
             raise B.BtwError('Thiếu file phôi %s cạnh phần mềm.' % DEFAULT_TPL)
         return p
 
+    def _donor_hint(self):
+        """Gợi ý khi không xuất .btw được vì phôi mặc định (tem bao) không đủ ô."""
+        using_default = not (getattr(self, '_donor_path', '') and os.path.exists(self._donor_path))
+        if self.is_pallet and using_default:
+            return ('\n\nTem pallet thường nhiều dòng hơn phôi mặc định (tem bao – 17 ô chữ).\n'
+                    'Hãy bấm "Chọn phôi .btw…" và chọn PHÔI TEM PALLET có đủ số dòng '
+                    '(vd TEM PALLET PA.btw),\nhoặc dùng "📄 Xuất PDF / 📊 Excel / 📝 Word" '
+                    '(không giới hạn số dòng).')
+        return ''
+
     def export(self):
         errs = D.check_limits(self.d)
         if errs:
-            messagebox.showwarning('Xuất .btw', '\n'.join(errs), parent=self)
+            messagebox.showwarning('Xuất .btw',
+                                   '\n'.join(errs) + self._donor_hint(), parent=self)
             return
-        d = self.fill._outdir()
+        d = self._outdir()
         nm = self.v_name.get().strip() or self.d.get('name') or 'MAU'
         size = '%gx%g' % (self.d['w_mm'], self.d['h_mm'])
         name = B.safe_name('TEM_%s' % nm if size in nm.replace(' ', '') else 'TEM_%s_%s' % (nm, size)).replace(' ', '_')
@@ -1507,7 +1612,7 @@ class DesignTab(tk.Frame):
         try:
             out, data = D.export_design(self.d, self._donor(), path)
         except Exception as ex:
-            messagebox.showerror('Xuất .btw', str(ex), parent=self)
+            messagebox.showerror('Xuất .btw', str(ex) + self._donor_hint(), parent=self)
             return
         self.fill.last_out = out
         self.fill.btn_bt.configure(state='normal')
@@ -1519,7 +1624,7 @@ class DesignTab(tk.Frame):
 
     def save_png(self):
         p = filedialog.asksaveasfilename(parent=self, defaultextension='.png', filetypes=[('PNG', '*.png')],
-                                         initialdir=self.fill._outdir(),
+                                         initialdir=self._outdir(),
                                          initialfile=B.safe_name('TEM_%s' % (self.d.get('name') or 'MAU')) + '.png')
         if p:
             D.render_design(self.d, px_per_mm=12, frame=False).save(p, dpi=(305, 305))
@@ -1529,7 +1634,7 @@ class DesignTab(tk.Frame):
         """Xuất mẫu tem theo khổ giấy A3/A4/A5 (A5 tự xếp 2 tem + đường cắt giữa)."""
         import tem_khogiay as TK
         TK.choose_and_export(self, lambda: D.render_design(self.d, px_per_mm=12, frame=False),
-                             default_dir=self.fill._outdir(),
+                             default_dir=self._outdir(),
                              default_name=B.safe_name('TEM_%s' % (self.d.get('name') or 'MAU')))
 
 
