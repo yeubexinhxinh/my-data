@@ -150,3 +150,30 @@ thư mục báo cáo. Dùng được cho **mọi tài khoản** (không cần qu
 
 > Báo cáo xuất ra ở dạng **PDF (A4)** và **Excel (.xlsx)**. Nút Xem trước hiển thị
 > đúng bản PDF sẽ xuất. (Cần `pip install reportlab pillow`.)
+
+---
+
+## Cập nhật thêm (đợt 8) — Thêm cột Độ trắng / Độ sáng vào sheet "Đơn giá vật tư"
+
+"Đơn giá vật tư" là **sheet dữ liệu** (16 cột, ~389 dòng), lưu trong `sheets.json`
+(đã **mã hoá**) hoặc trên **máy chủ** — không nằm trong mã Python. Nên 2 cột mới
+phải thêm vào DỮ LIỆU, không phải sửa code.
+
+Hai cột **"Độ trắng"** và **"Độ sáng"** được chèn **ngay sau cột "Cỡ hạt µm"**
+(các cột % Tro, Tạp chất... dịch sang phải).
+
+**Cách 1 — chạy máy chủ/admin (khuyên dùng, hợp mọi chế độ):**
+  1. Chép `them_cot_do_trang_do_sang.py` cạnh `app_hitechplast.py`.
+  2. **Sao lưu** dữ liệu trước.
+  3. Chạy: `python them_cot_do_trang_do_sang.py` (tự nhận máy chủ/offline/cục bộ,
+     tự mã hoá lại, chạy lại nhiều lần vẫn an toàn).
+
+**Cách 2 — chỉ máy chạy LƯU CỤC BỘ (không máy chủ):**
+  Chép đè `sheets_da_them_cot_DoTrang_DoSang.json` thành `sheets.json` trong thư
+  mục phần mềm (file này đã mã hoá sẵn, đã chèn 2 cột). KHÔNG dùng cách này nếu
+  đang chạy chế độ máy chủ (sẽ bị dữ liệu máy chủ ghi đè).
+
+> Hiện 2 cột để **nhập dữ liệu** (giá trị độ trắng/sáng của vật tư). Nếu muốn
+> phần mềm tự dùng 2 cột này làm **tiêu chuẩn tự đối chiếu** trong báo cáo QC
+> (như MFI/% Tro), báo tôi để thêm vào bộ nhận diện chỉ tiêu (RM_KEYS/BB_UP_COLS
+> trong qc_app.py).
