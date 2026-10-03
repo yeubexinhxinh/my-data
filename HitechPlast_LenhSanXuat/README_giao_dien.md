@@ -393,3 +393,24 @@ Mục "3. Ảnh trên máy chủ" nay hiện thêm:
   `img_cfg` — chính là thư mục admin đặt ở máy chủ).
 
 Chép đè `app_hitechplast.py`.
+
+---
+
+## Cập nhật thêm (đợt 22) — Sửa: chỉ MÁY CHỦ ghi "thư mục nguồn máy chủ"
+
+Lỗi trước: mọi máy đều ghi cấu hình chung → máy con/máy admin ghi đè đường dẫn
+của mình (C:\Users\admin\Desktop) lên "thư mục máy chủ". Và mục 2 "Thư mục trên máy
+này" (vốn là cục bộ) bị đồng bộ nhầm.
+
+Sửa:
+- Mục 2 "Thư mục ảnh trên máy này" trở lại **cục bộ từng máy** (không đồng bộ).
+- Thêm `_is_server_host()` (host CSDL = localhost). **Chỉ chính MÁY CHỦ** khi bấm
+  Lưu mới ghi `stamp_dir/pkg_dir` + tên máy vào kho chung (`img_cfg`).
+- Mục 3 hiển thị "Thư mục nguồn trên MÁY CHỦ <tên máy>: …" đọc từ kho chung (các
+  máy khác chỉ xem).
+
+> Để sửa đường dẫn đang sai: mở phần mềm **trên chính MÁY CHỦ (MAY001)** → "Ảnh
+> Tem/Bao bì" → đặt đúng thư mục → **Lưu** (1 lần). Lúc đó kho chung mới ghi đúng
+> đường dẫn của máy chủ; các máy khác sẽ thấy đúng.
+
+Chép đè `app_hitechplast.py`.

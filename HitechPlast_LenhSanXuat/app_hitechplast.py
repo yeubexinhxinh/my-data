@@ -2024,39 +2024,48 @@ def save_app_policy(pol):
     save_settings(st)
 
 
-# ---- Dong bo CAU HINH THU MUC ANH giua may chu <-> may con (dung kho kv chung) ----
+# ---- THU MUC NGUON ANH TREN MAY CHU (chi may chu ghi; may khac xem) ----
+#  Luu y: 'stamp_dir'/'pkg_dir' trong settings.json la THU MUC TREN MAY NAY (cuc bo, moi may rieng).
+#  Rieng THU MUC NGUON cua CHINH MAY CHU duoc luu vao kho chung (kv) de moi may XEM duoc.
 IMG_CFG_KEY = 'img_cfg'
-IMG_CFG_FIELDS = ('stamp_dir', 'pkg_dir', 'img_local_fallback', 'img_source')
 
 
-def load_img_cfg():
-    """Che do may chu: doc cau hinh thu muc anh DUNG CHUNG tu may chu (kv) -> ghi vao
-    settings.json cua may nay (de moi may thay cung cai dat). Tra ve settings da gop."""
-    st = load_settings()
-    if datastore.is_server():
-        try:
-            cfg = datastore.server().kv_get(IMG_CFG_KEY, track=False)
-        except Exception:
-            cfg = None
-        if isinstance(cfg, dict):
-            changed = False
-            for k in IMG_CFG_FIELDS:
-                if k in cfg and cfg[k] not in (None, '') and st.get(k) != cfg[k]:
-                    st[k] = cfg[k]
-                    changed = True
-            if changed:
-                save_settings(st)
-    return st
+def _is_server_host():
+    """May DANG CHAY co phai chinh MAY CHU (host CSDL = localhost) khong."""
+    if not datastore.is_server():
+        return False
+    try:
+        import presence
+        hosts = presence.server_hosts() or []
+        return any(h in ('localhost', '127.0.0.1', '::1') for h in hosts)
+    except Exception:
+        return False
+
+
+def server_img_dirs():
+    """Thu muc nguon anh cau hinh TREN MAY CHU (de hien thi cho moi may). {} neu chua co."""
+    if not datastore.is_server():
+        return {}
+    try:
+        cfg = datastore.server().kv_get(IMG_CFG_KEY, track=False)
+        return cfg if isinstance(cfg, dict) else {}
+    except Exception:
+        return {}
 
 
 def save_img_cfg(st):
-    """Luu cau hinh thu muc anh: che do may chu -> ghi len may chu (dung chung) + may nay."""
-    if datastore.is_server():
+    """Luu cai dat anh: LUON ghi may nay (settings.json cuc bo). CHI khi may nay LA MAY CHU
+    moi ghi thu muc nguon len kho chung (kv) de cac may khac xem duoc."""
+    save_settings(st)
+    if _is_server_host():
         try:
-            datastore.server().kv_put(IMG_CFG_KEY, {k: st.get(k) for k in IMG_CFG_FIELDS}, force=True)
+            datastore.server().kv_put(IMG_CFG_KEY, {
+                'stamp_dir': st.get('stamp_dir', ''),
+                'pkg_dir': st.get('pkg_dir', ''),
+                'host': os.environ.get('COMPUTERNAME') or '',
+            }, force=True)
         except Exception:
             pass
-    save_settings(st)
 
 
 def load_store():
@@ -5800,7 +5809,7 @@ class ImagePathDialog(tk.Toplevel):
         self.title('Ảnh Tem / Bao bì')
         self.configure(bg='#f4f6f9')
         self.transient(master)
-        st = load_img_cfg()                 # nạp cấu hình thư mục ảnh dùng chung từ máy chủ
+        st = getattr(app, 'settings', None) or load_settings()   # thư mục mục 2 là của MÁY NÀY (cục bộ)
         self.app.settings = st
         self.srv_ok = image_sync.server_available()
         self.v_mode = tk.StringVar(value=image_sync.mode(st))
@@ -5890,19 +5899,17 @@ class ImagePathDialog(tk.Toplevel):
             return
         try:
             n = self.IS.server_counts()
-            cfg = {}
-            try:
-                if datastore.is_server():
-                    cfg = datastore.server().kv_get(IMG_CFG_KEY, track=False) or {}
-            except Exception:
-                cfg = {}
+            cfg = server_img_dirs()
             sdir = cfg.get('stamp_dir') or ''
             pdir = cfg.get('pkg_dir') or ''
+            host = cfg.get('host') or ''
             txt = (f"Máy chủ đang lưu: {n.get('stamp', 0)} ảnh Tem   •   {n.get('pkg', 0)} ảnh Bao bì\n"
-                   f"Nơi lưu: database máy chủ (htp_images).")
+                   f"Nơi lưu: database máy chủ (htp_images) – mọi máy dùng chung.")
             if sdir or pdir:
-                txt += (f"\nThư mục nguồn trên máy chủ:  Tem = {sdir or '(chưa đặt)'}"
-                        f"   •   Bao bì = {pdir or '(chưa đặt)'}")
+                txt += (f"\nThư mục nguồn trên MÁY CHỦ{(' ' + host) if host else ''}:  "
+                        f"Tem = {sdir or '(chưa đặt)'}   •   Bao bì = {pdir or '(chưa đặt)'}")
+            else:
+                txt += "\nThư mục nguồn trên máy chủ: (máy chủ chưa Lưu cấu hình thư mục)"
             txt += f"\nBộ nhớ đệm trên máy này: {self.IS.cache_root()}"
             self.lbl_srv.config(text=txt, fg='#1d3557')
         except Exception as e:
@@ -6348,7 +6355,7 @@ class App(tk.Tk):
             self.sheets = self._load('sheets.json', required=False) or []
         datastore.set_live_sheets(self.sheets)
         datastore.audit_baseline_data(self.data)
-        self.settings = load_img_cfg()      # nạp cả cấu hình thư mục ảnh dùng chung từ máy chủ
+        self.settings = load_settings()
         try:                                  # danh sach day chuyen dung chung (line_config.py)
             import line_config
             line_config.reload()
