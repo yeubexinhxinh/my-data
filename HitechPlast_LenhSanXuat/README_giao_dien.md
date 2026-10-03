@@ -329,3 +329,21 @@ Code: `btw_design.py` thêm `logo`/`logo_h` vào thiết kế; `compute_layout` 
 logo (`logo_rect`); `render_design` vẽ logo. Chép đè `btw_design.py` + `tem_ui.py`.
 
 > Lưu ý: logo chỉ áp cho bản ảnh/PDF/Excel/Word (vì .btw của phôi không có ô ảnh).
+
+---
+
+## Cập nhật thêm (đợt 18) — Máy chủ bật lại: chuyển ngay, không cần đóng cửa sổ xem
+
+Trước đây khi máy chủ bật lại, máy con OFFLINE báo "đóng cửa sổ đang mở để chuyển
+về" và chờ đóng MỌI cửa sổ con (kể cả cửa sổ chỉ để xem). Nay:
+
+- Thêm `_ui_modal_busy()`: chỉ coi là "bận" khi đang có **HỘP THOẠI SỬA (modal /
+  grab)** — ví dụ đang sửa lệnh/sửa dòng.
+- `_go_online` dùng `_ui_modal_busy()` thay cho `_ui_busy()`: **cửa sổ xem thường
+  (xem trước, danh sách, bảng ảnh…) KHÔNG còn chặn** → máy chủ bật là chuyển sống
+  ngay, không cần đóng.
+- Vẫn **chờ trong đúng 1 trường hợp**: đang mở hộp thoại SỬA dở — vì đổi database
+  ngay dưới một thao tác sửa có thể làm **mất/lệch dữ liệu đang nhập**. Đóng/lưu
+  hộp thoại đó là chuyển ngay (tự động, không phải mở lại app).
+
+Chép đè `app_hitechplast.py`.
