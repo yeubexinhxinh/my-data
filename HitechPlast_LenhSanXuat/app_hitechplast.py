@@ -7794,7 +7794,7 @@ class App(tk.Tk):
             ch, updated = self._auto_refresh(ch)
         if self.lbl_sync is not None:
             if not ok:
-                self.lbl_sync.config(text='⚠ Mất kết nối máy chủ', fg='#ff8a80')
+                self.lbl_sync.config(text='⚠ Mất kết nối máy chủ – đang thử máy chủ dự phòng…', fg='#ff8a80')
             elif ch:
                 self.lbl_sync.config(text='🔔 Máy khác vừa cập nhật - sẽ tự cập nhật khi đóng cửa sổ đang mở',
                                      fg='#ffd166')
@@ -7802,7 +7802,105 @@ class App(tk.Tk):
                 self.lbl_sync.config(text=f'✔ Đã tự cập nhật lúc {time.strftime("%H:%M:%S")}', fg='#8fd694')
             elif not self._sync_msg_kept():
                 self.lbl_sync.config(text='', fg='#8fd694')
+        if not ok:
+            self._try_reconnect()          # mat ket noi -> tu chuyen may chu chinh/du phong NGAY, KHONG thoat app
         self.after(AUTO_SYNC_MS if ok else 15000, self._poll_server)
+
+    def _try_reconnect(self):
+        """Mat ket noi may chu chinh -> thu ket noi lai (CHINH truoc, khong duoc thi MAY CHU DU PHONG)
+        va chuyen sang NGAY trong lúc đang chạy, KHÔNG thoát/khởi động lại app.
+        Chi ap dung cho may dang o che do may chu (máy con / máy chính), khong phai offline / linked /
+        dang dung du phong (truong hop du phong da co _standby_tick lo failback)."""
+        import datastore
+        if getattr(self, '_reconn_busy', False) or getattr(self, '_reconn_pending', False):
+            return
+        try:
+            if datastore.is_offline() or datastore.is_backup() or datastore.is_linked():
+                return
+            if not datastore.is_server():
+                return
+            cfg = datastore.load_config()
+        except Exception:
+            return
+        if not cfg:
+            return
+        if self._ui_modal_busy():          # dang SUA (hop thoai modal) -> cho, tranh mat thao tac
+            self._reconn_pending = True
+
+            def _resume():
+                self._reconn_pending = False
+                self._try_reconnect()
+            self.after(3000, _resume)
+            return
+        self._reconn_busy = True
+        res = {}
+
+        def work():
+            try:
+                res['st'] = datastore._connect_main_or_backup(cfg)   # CHINH -> DU PHONG
+            except Exception as e:
+                res['err'] = e
+
+        th = threading.Thread(target=work, daemon=True)
+        th.start()
+
+        def wait():
+            try:
+                if not self.winfo_exists():
+                    return
+            except Exception:
+                return
+            if th.is_alive():
+                self.after(400, wait)
+                return
+            self._reconn_busy = False
+            st = res.get('st')
+            if st is None:                 # ca chinh lan du phong deu chua toi duoc -> giu badge, poll sau thu lai
+                return
+            self._apply_reconnect(st)
+        self.after(400, wait)
+
+    def _apply_reconnect(self, st):
+        """Thay ServerStore dang dung bang ket noi moi (chinh hoac du phong) ngay tai cho."""
+        import datastore
+        old = datastore.server()
+        if old is st:
+            return
+        try:
+            st.who = datastore._WHO
+        except Exception:
+            pass
+        datastore.go_online(st)            # _SERVER = st, mode = 'server' (giu nguyen che do may chu)
+        try:
+            if old is not None and old is not st:
+                old.c.close()
+        except Exception:
+            pass
+        try:                               # lam moi ket noi + cache QC
+            import qc_app
+            if qc_app.STORE is not None:
+                qc_app.STORE.con = datastore.qc_connection()
+                qc_app.STORE.cache.clear()
+                qc_app.STORE.idx_cache.clear()
+                qc_app.STORE.ver += 1
+        except Exception:
+            pass
+        try:
+            load_store()                   # nap lai sheets / don hang tu may chu moi
+        except Exception:
+            pass
+        on_bk = bool(getattr(st, 'cfg', {}).get('is_backup'))
+        if self.lbl_sync is not None:
+            if on_bk:
+                self.lbl_sync.config(
+                    text='🛟 Đã chuyển sang MÁY CHỦ DỰ PHÒNG (máy chính đang tắt) · tự về khi máy chính bật',
+                    fg='#ffd166')
+            else:
+                self.lbl_sync.config(text=f'✔ Đã kết nối lại máy chủ lúc {time.strftime("%H:%M:%S")}', fg='#8fd694')
+                self._last_auto = time.time()
+        if on_bk and not getattr(self, '_sb_started', False):
+            self._sb_started = True        # bat nhip standby de tu failback khi may chinh bat lai
+            self.after(4000, self._standby_tick)
 
     def _sync_msg_kept(self):
         """Giu dong 'Da tu cap nhat luc ...' khoang 1 phut roi moi tro ve ten may chu."""
