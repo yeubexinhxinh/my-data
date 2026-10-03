@@ -251,3 +251,16 @@ Thay đổi code (zalo_send.py):
 - Nhãn hàng & thông báo trống cập nhật cho đúng.
 
 Chép đè `zalo_send.py`.
+
+---
+
+## Cập nhật thêm (đợt 13) — Xem trước tem: thêm Xuất PDF + ×2 tem A5 (kẻ giữa)
+
+Cửa sổ **"👁 Xem trước tem"** nay có thêm:
+- **📄 Xuất PDF**: xuất 1 tem ra PDF **đúng kích thước tem** (in ra đúng khổ), mở
+  luôn sau khi xuất.
+- **🖨 ×2 tem A5 (kẻ giữa)**: CHỈ hiện khi kích thước tem là **A5** (148×210, kể cả
+  xoay ngang) — xuất 1 trang A5 có **2 tem + đường cắt nét đứt ở giữa**.
+
+Dùng chung `tem_khogiay.py` (thêm `save_label_pdf`, `is_a5`). Chép đè `tem_ui.py`
+và `tem_khogiay.py`.

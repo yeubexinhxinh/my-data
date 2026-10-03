@@ -110,6 +110,24 @@ def compose_page(label_img, paper='A4', dpi=300, two_up=None,
     return page
 
 
+def save_label_pdf(label_img, path, size_mm, dpi=300):
+    """Xuất 1 tem ra PDF ĐÚNG kích thước tem (size_mm = (rộng, cao) mm)."""
+    from PIL import Image
+    w_mm, h_mm = size_mm
+    W = max(1, int(round(w_mm / 25.4 * dpi)))
+    H = max(1, int(round(h_mm / 25.4 * dpi)))
+    im = label_img.convert('RGB').resize((W, H), Image.LANCZOS)
+    im.save(path, 'PDF', resolution=float(dpi))
+    return path
+
+
+def is_a5(size_mm, tol=3.0):
+    """size_mm có phải khổ A5 (148x210) không, kể cả xoay ngang."""
+    w, h = size_mm
+    a, b = sorted((w, h))
+    return abs(a - 148) <= tol and abs(b - 210) <= tol
+
+
 def export_page(label_img, path, paper='A4', dpi=300, **kw):
     """Ghép rồi lưu .pdf (in được) hoặc .png."""
     page = compose_page(label_img, paper=paper, dpi=dpi, **kw)

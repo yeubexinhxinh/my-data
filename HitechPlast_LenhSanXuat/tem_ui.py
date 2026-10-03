@@ -865,6 +865,7 @@ class PreviewWindow(tk.Toplevel):
         self.title('👁 Xem trước tem – %s' % title)
         self.transient(master.winfo_toplevel())
         self.img = img
+        self.size_mm = size_mm
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         self.zoom = min(1.0, (sw * 0.8) / img.width, (sh * 0.72) / img.height)
         self.geometry('%dx%d' % (max(760, min(sw * 0.85, img.width * self.zoom + 40)),
@@ -887,6 +888,17 @@ class PreviewWindow(tk.Toplevel):
         if on_export:
             tk.Button(bt, text='💾 Xuất .btw', bg='#0068ff', fg='white', relief='flat', font=FONT_B, padx=14,
                       command=lambda: (self.destroy(), on_export())).pack(side='right', padx=4)
+        # Xuat PDF (1 tem dung kich thuoc)
+        tk.Button(bt, text='📄 Xuất PDF', bg='#b0413e', fg='white', relief='flat', font=FONT_B, padx=12,
+                  command=self._export_pdf).pack(side='right', padx=4)
+        # Neu dang chon A5: them nut xuat 2 tem + duong ke giua
+        try:
+            import tem_khogiay as _TK
+            if _TK.is_a5(self.size_mm):
+                tk.Button(bt, text='🖨 ×2 tem A5 (kẻ giữa)', bg='#6a1b9a', fg='white', relief='flat',
+                          font=FONT_B, padx=12, command=self._export_2up_a5).pack(side='right', padx=4)
+        except Exception:
+            pass
         self.cv.bind('<Configure>', lambda e: self._show())
         self.bind('<Escape>', lambda e: self.destroy())
         self.focus_set()
@@ -898,6 +910,40 @@ class PreviewWindow(tk.Toplevel):
         else:
             self.zoom = max(0.1, min(6, self.zoom * f))
         self._show()
+
+    def _export_pdf(self):
+        """Xuất 1 tem ra PDF đúng kích thước tem."""
+        import tem_khogiay as TK
+        p = filedialog.asksaveasfilename(parent=self, defaultextension='.pdf',
+                                         filetypes=[('PDF', '*.pdf')], initialfile='Tem.pdf')
+        if not p:
+            return
+        try:
+            TK.save_label_pdf(self.img, p, self.size_mm)
+        except Exception as e:
+            messagebox.showerror('Lỗi xuất PDF', str(e), parent=self)
+            return
+        try:
+            _open_path(p)
+        except Exception:
+            pass
+
+    def _export_2up_a5(self):
+        """Xuất 2 tem trên 1 trang A5 + kẻ đường cắt ở giữa."""
+        import tem_khogiay as TK
+        p = filedialog.asksaveasfilename(parent=self, defaultextension='.pdf',
+                                         filetypes=[('PDF', '*.pdf')], initialfile='Tem_A5_2tem.pdf')
+        if not p:
+            return
+        try:
+            TK.export_page(self.img, p, paper='A5', two_up=True, cut_line=True)
+        except Exception as e:
+            messagebox.showerror('Lỗi xuất PDF', str(e), parent=self)
+            return
+        try:
+            _open_path(p)
+        except Exception:
+            pass
 
     def _show(self):
         from PIL import ImageTk, Image
