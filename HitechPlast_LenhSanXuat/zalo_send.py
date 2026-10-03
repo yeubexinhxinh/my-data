@@ -2489,9 +2489,16 @@ def job_lines(job, provider=None):
 
 
 def job_uses_slot_imgs(job):
-    """Lich nao dung anh theo moc: 'Mau moi nhat tung day chuyen' (luc hen gio mau chua co).
-    Lich 'Chon DC / moc' / 'Mau dang chon' dung anh rieng cua TUNG MAU (moc) da chon."""
+    """Lich 'Mau moi nhat tung day chuyen' (luc hen gio mau chua co) -> dung HOAN TOAN
+    anh theo moc (co the 'slot_img_only' de trong khi thieu)."""
     return job.get("content") == "latest"
+
+
+def job_can_slot(job):
+    """Lich CO THE gan anh theo moc / day chuyen (hien trong bang 'Anh theo moc / DC'):
+    - 'latest': dung anh theo moc.
+    - 'pick' / 'selected': them anh RIENG cho tung moc; THIEU thi tu dung anh cua mau."""
+    return job.get("content") in ("latest", "pick", "selected")
 
 
 def slot_missing(job, lines):
@@ -2546,7 +2553,7 @@ class SlotImagesDialog(tk.Toplevel):
         self.grab_set()
 
     def _jobs(self):
-        js = [j for j in self.panel.jobs() if job_uses_slot_imgs(j)]
+        js = [j for j in self.panel.jobs() if job_can_slot(j)]
         if self.only_job:
             js = [j for j in js if j["id"] == self.only_job] or js
         now = dt.datetime.now()
@@ -2558,23 +2565,11 @@ class SlotImagesDialog(tk.Toplevel):
             w.destroy()
         js = self._jobs()
         if not js:
-            # Co the dang co lich 'Chon DC/moc' / 'Mau dang chon' -> huong dan dat anh dung cho
-            others = [j for j in self.panel.jobs()
-                      if (j.get("content") in ("pick", "selected")) and not self.only_job]
-            if others:
-                msg = ("Cửa sổ này CHỈ dùng cho lịch 'Mẫu mới nhất từng dây chuyền'.\n\n"
-                       "Lịch bạn đang có là 'Chọn DC / mốc' (hoặc 'Mẫu đang chọn') — ảnh gắn theo "
-                       "TỪNG MẪU đã chọn, KHÔNG đặt ở đây. Cách làm:\n"
-                       "   1) Ở bảng lịch bên dưới, chọn đúng lịch đó → bấm '✏ Sửa'.\n"
-                       "   2) Bấm '🎯 Chọn DC / mốc…' để mở bảng chọn mẫu.\n"
-                       "   3) Trong bảng đó, bấm cột 🎞 (màng film) / ⚪ (hạt Filler) của từng mốc "
-                       "để chọn ảnh cho dây chuyền.\n\n"
-                       "Nếu muốn gửi theo 'mẫu mới nhất từng dây chuyền' (lúc hẹn giờ mẫu chưa có), "
-                       "hãy bấm '➕ Thêm lịch' → Nội dung: Mẫu mới nhất từng dây chuyền.")
-            else:
-                msg = ("Chưa có lịch 'Mẫu mới nhất từng dây chuyền'.\n"
-                       "Bấm '➕ Thêm lịch' → Nội dung: Mẫu mới nhất từng dây chuyền → giờ gửi "
-                       "(nhiều mốc: 08:00, 10:00, 14:00).")
+            msg = ("Chưa có lịch nào để gắn ảnh theo mốc.\n\n"
+                   "Bấm '➕ Thêm lịch' rồi mở lại cửa sổ này:\n"
+                   "• 'Chọn DC / mốc' hoặc 'Mẫu đang chọn': mỗi mốc × dây chuyền có ô 🎞/⚪ để thêm "
+                   "ảnh RIÊNG (thiếu thì tự dùng ảnh của mẫu).\n"
+                   "• 'Mẫu mới nhất từng dây chuyền': nhập giờ gửi (nhiều mốc: 08:00, 10:00, 14:00).")
             tk.Label(self.gf, text=msg, bg="#f7f9fc", fg="#555", font=("Segoe UI", 10),
                      justify="left", wraplength=980).grid(padx=20, pady=20, sticky="w")
             self.lbl.configure(text="")
@@ -2597,9 +2592,10 @@ class SlotImagesDialog(tk.Toplevel):
         for r, j in enumerate(js, 1):
             n = job_next(j, now) if j.get("on", True) else None
             on = j.get("on", True)
+            # latest + slot_img_only: thiếu -> để trống. Còn lại (latest ko only, hoặc pick/selected): thiếu -> dùng ảnh mẫu
+            _note = "" if (job_uses_slot_imgs(j) and j.get("slot_img_only")) else "  · thiếu → dùng ảnh mẫu"
             txt = "%s  %s\n%s%s" % ("⏰" if on else "⏸", self.panel._when(j),
-                                    ("lần tới %s" % n.strftime("%d/%m %H:%M")) if n else "(đang tắt)",
-                                    "" if j.get("slot_img_only") else "  · thiếu → dùng ảnh mẫu")
+                                    ("lần tới %s" % n.strftime("%d/%m %H:%M")) if n else "(đang tắt)", _note)
             tk.Label(self.gf, text=txt, bg="#eaf0f8" if on else "#eeeeee", fg="#1f3a5f" if on else "#888",
                      font=("Segoe UI", 9, "bold"), justify="left", anchor="w", padx=8, pady=4
                      ).grid(row=r, column=0, sticky="nsew", padx=1, pady=1)
@@ -2944,8 +2940,11 @@ class ZaloPanel(ttk.Frame):
         logo = self.p.logo()
         out = []
         for s, i in pairs:
-            if job is not None and job.get("id") and job_uses_slot_imgs(job):
-                i = slot_info(i, job)
+            if job is not None and job.get("id"):
+                if job_uses_slot_imgs(job):
+                    i = slot_info(i, job)                       # latest: theo moc (ton trong slot_img_only)
+                elif job.get("content") in ("pick", "selected"):
+                    i = slot_info(i, dict(job, slot_img_only=False))  # moc: co anh slot thi dung, thieu -> anh mau
             out.append((s, build_text(i), render_card(i, logo), i))
         return out
 
@@ -2972,7 +2971,8 @@ class ZaloPanel(ttk.Frame):
                 if not x:
                     return "mẫu đang chọn", []
                 items = [x]
-            return "mẫu DC%s %s" % (items[0][1].get("line_no", ""), items[0][1].get("time", "")), self._cards(items)
+            return ("mẫu DC%s %s" % (items[0][1].get("line_no", ""), items[0][1].get("time", "")),
+                    self._cards(items, job if job else None))
         if content == "latest":
             items = latest_per_line(self._pool(now), lines) if lines else self.p.latest(now)
             return "mẫu mới nhất %d dây chuyền" % len(items), self._cards(items, job if job else None)
@@ -2984,7 +2984,7 @@ class ZaloPanel(ttk.Frame):
                 return "mẫu đã chọn", []
             desc = "%d mẫu chọn (%s)" % (len(items), pick_desc([i for _, i in items]))
             if not summ:
-                return desc, self._cards(items)
+                return desc, self._cards(items, job if job else None)
             infos = [i for _, i in items]
             dates = sorted({i.get("date", "") for i in infos if i.get("date")})
             sub = "%s  ·  %d mẫu  ·  %s" % (", ".join(dates), len(infos), pick_desc(infos))
@@ -3166,7 +3166,7 @@ class ZaloPanel(ttk.Frame):
         """Mo bang up anh theo MOC GUI x DAY CHUYEN."""
         if job_id is None:
             j = self._sel_job()
-            job_id = j["id"] if j and job_uses_slot_imgs(j) else None
+            job_id = j["id"] if j and job_can_slot(j) else None
         SlotImagesDialog(self.winfo_toplevel(), self, job_id)
 
     def _sel_job(self):

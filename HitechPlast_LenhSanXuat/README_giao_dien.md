@@ -230,3 +230,24 @@ chuyền"), cửa sổ nay **ghi rõ**: cửa sổ này chỉ dùng cho lịch "
 dây chuyền"; còn lịch "Chọn DC/mốc" thì đặt ảnh bằng **Sửa → 🎯 Chọn DC/mốc… →
 bấm cột 🎞/⚪ của từng mốc**. (Đây là đúng thiết kế, không phải lỗi — chỉ thiếu
 hướng dẫn nên nhìn như trống.)
+
+---
+
+## Cập nhật thêm (đợt 12) — Lịch "Chọn DC/mốc" thêm được ẢNH THEO TỪNG MỐC
+
+Trước đây cửa sổ "🖼 Ảnh theo mốc / DC" chỉ nhận lịch "Mẫu mới nhất từng dây
+chuyền". Nay nhỗ trợ cả lịch **"Chọn DC / mốc"** và **"Mẫu đang chọn"**:
+
+- Mở "🖼 Ảnh theo mốc / DC" → bảng hiện các lịch pick/selected; mỗi ô
+  (mốc × dây chuyền) có nút **🎞 (màng film)** / **⚪ (hạt Filler)** để thêm ảnh
+  RIÊNG cho mốc đó.
+- Khi gửi: mốc nào ĐÃ thêm ảnh riêng → dùng ảnh đó; mốc nào CHƯA → **tự dùng ảnh
+  của mẫu** (không để trống). Không làm thay đổi cách chạy của các lịch cũ.
+
+Thay đổi code (zalo_send.py):
+- Thêm `job_can_slot()` (latest + pick + selected) cho bảng ảnh và nút mở.
+- `_items` truyền `job` vào `_cards` cho pick/selected; `_cards` áp `slot_info`
+  (fallback ảnh mẫu, ép `slot_img_only=False` để không bao giờ để trống).
+- Nhãn hàng & thông báo trống cập nhật cho đúng.
+
+Chép đè `zalo_send.py`.
