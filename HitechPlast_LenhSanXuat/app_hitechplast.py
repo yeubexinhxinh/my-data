@@ -2024,6 +2024,41 @@ def save_app_policy(pol):
     save_settings(st)
 
 
+# ---- Dong bo CAU HINH THU MUC ANH giua may chu <-> may con (dung kho kv chung) ----
+IMG_CFG_KEY = 'img_cfg'
+IMG_CFG_FIELDS = ('stamp_dir', 'pkg_dir', 'img_local_fallback', 'img_source')
+
+
+def load_img_cfg():
+    """Che do may chu: doc cau hinh thu muc anh DUNG CHUNG tu may chu (kv) -> ghi vao
+    settings.json cua may nay (de moi may thay cung cai dat). Tra ve settings da gop."""
+    st = load_settings()
+    if datastore.is_server():
+        try:
+            cfg = datastore.server().kv_get(IMG_CFG_KEY, track=False)
+        except Exception:
+            cfg = None
+        if isinstance(cfg, dict):
+            changed = False
+            for k in IMG_CFG_FIELDS:
+                if k in cfg and cfg[k] not in (None, '') and st.get(k) != cfg[k]:
+                    st[k] = cfg[k]
+                    changed = True
+            if changed:
+                save_settings(st)
+    return st
+
+
+def save_img_cfg(st):
+    """Luu cau hinh thu muc anh: che do may chu -> ghi len may chu (dung chung) + may nay."""
+    if datastore.is_server():
+        try:
+            datastore.server().kv_put(IMG_CFG_KEY, {k: st.get(k) for k in IMG_CFG_FIELDS}, force=True)
+        except Exception:
+            pass
+    save_settings(st)
+
+
 def load_store():
     """Doc kho tai khoan ma hoa (users.dat). Lan dau -> nhap tu users.json."""
     d = secure_store.load()
@@ -5765,7 +5800,7 @@ class ImagePathDialog(tk.Toplevel):
         self.title('Ảnh Tem / Bao bì')
         self.configure(bg='#f4f6f9')
         self.transient(master)
-        st = getattr(app, 'settings', None) or load_settings()
+        st = load_img_cfg()                 # nạp cấu hình thư mục ảnh dùng chung từ máy chủ
         self.app.settings = st
         self.srv_ok = image_sync.server_available()
         self.v_mode = tk.StringVar(value=image_sync.mode(st))
@@ -6038,8 +6073,10 @@ class ImagePathDialog(tk.Toplevel):
         self.app.settings['img_local_fallback'] = bool(self.v_fallback.get())
         self.app.settings['stamp_dir'] = self.v_stamp.get().strip()
         self.app.settings['pkg_dir'] = self.v_pkg.get().strip()
-        save_settings(self.app.settings)
-        messagebox.showinfo('Đã lưu', 'Đã lưu cài đặt ảnh Tem / Bao bì.', parent=self)
+        save_img_cfg(self.app.settings)     # ghi lên máy chủ (dùng chung) + máy này
+        extra = '\n\n(Đã lưu lên máy chủ – các máy khác sẽ tự đồng bộ cài đặt này.)' \
+            if datastore.is_server() else ''
+        messagebox.showinfo('Đã lưu', 'Đã lưu cài đặt ảnh Tem / Bao bì.' + extra, parent=self)
         self.destroy()
 
 
@@ -6299,7 +6336,7 @@ class App(tk.Tk):
             self.sheets = self._load('sheets.json', required=False) or []
         datastore.set_live_sheets(self.sheets)
         datastore.audit_baseline_data(self.data)
-        self.settings = load_settings()
+        self.settings = load_img_cfg()      # nạp cả cấu hình thư mục ảnh dùng chung từ máy chủ
         try:                                  # danh sach day chuyen dung chung (line_config.py)
             import line_config
             line_config.reload()

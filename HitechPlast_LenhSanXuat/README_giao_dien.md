@@ -347,3 +347,23 @@ về" và chờ đóng MỌI cửa sổ con (kể cả cửa sổ chỉ để xe
   hộp thoại đó là chuyển ngay (tự động, không phải mở lại app).
 
 Chép đè `app_hitechplast.py`.
+
+---
+
+## Cập nhật thêm (đợt 19) — Đồng bộ cấu hình THƯ MỤC ẢNH máy chủ ↔ máy con
+
+Trước đây `stamp_dir`/`pkg_dir`/`img_source`/`img_local_fallback` chỉ lưu trong
+`settings.json` **cục bộ từng máy** → máy con không thấy thư mục máy chủ đã đặt.
+
+Nay dùng **kho cài đặt chung trên máy chủ** (kv, giống `app_policy`):
+- Mở hộp thoại "Ảnh Tem / Bao bì" → `load_img_cfg()` kéo cấu hình chung từ máy chủ về.
+- Bấm **💾 Lưu** (ở máy chủ hoặc máy có quyền) → `save_img_cfg()` ghi lên máy chủ;
+  các máy khác **tự đồng bộ** khi mở app / mở hộp thoại.
+- Lúc khởi động app cũng nạp cấu hình chung (`load_img_cfg()`).
+
+Code (app_hitechplast.py): thêm `IMG_CFG_KEY`, `load_img_cfg()`, `save_img_cfg()`;
+nối vào hộp thoại ảnh và lúc khởi động. Chép đè `app_hitechplast.py`.
+
+> Lưu ý: cấu hình được chia sẻ gồm đường dẫn thư mục + chế độ nguồn ảnh. Nếu các
+> máy có ổ đĩa khác nhau (C:\ vs D:\), nên dùng đường dẫn ổ mạng chung
+> (\\MAY-CHU\...) để mọi máy mở được, hoặc để chế độ MÁY CHỦ (ảnh lấy từ database).
