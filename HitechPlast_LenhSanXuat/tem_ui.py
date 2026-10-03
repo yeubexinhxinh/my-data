@@ -1022,6 +1022,11 @@ class DesignTab(tk.Frame):
         self._job = None
         self._build()
         self._to_ui()
+        # tu lay mau tem dung chung tu may chu (neu co) -> cac may con dung chung
+        try:
+            self.after(1200, lambda: self.pull_lib(silent=True))
+        except Exception:
+            pass
 
     # ------------------------------------------------------------ thu vien mau
     def _load_lib(self):
@@ -1112,6 +1117,11 @@ class DesignTab(tk.Frame):
         lbb.pack(fill='x', pady=(4, 0))
         ttk.Button(lbb, text='📂 Mở', command=self.open_lib).pack(side='left')
         ttk.Button(lbb, text='🗑 Xoá', command=self.del_lib).pack(side='left', padx=3)
+        # --- dung chung qua may chu (cac may con lay mau tem tu may chu)
+        lbb2 = ttk.Frame(lf)
+        lbb2.pack(fill='x', pady=(3, 0))
+        ttk.Button(lbb2, text='⬆ Lên máy chủ', command=self.push_lib).pack(side='left')
+        ttk.Button(lbb2, text='⬇ Từ máy chủ', command=lambda: self.pull_lib(silent=False)).pack(side='left', padx=3)
         body.add(lf, minsize=170, width=210)
         # --- cac dong
         mf = ttk.LabelFrame(body, text=' Các dòng của tem (bấm 1 dòng để sửa) ', padding=4)
@@ -1471,6 +1481,92 @@ class DesignTab(tk.Frame):
             del self.lib[s[0]]
             self._save_lib()
             self._fill_lib()
+
+    # ------------------------------------------------------------ dung chung qua may chu
+    def _srv_key(self):
+        """Khoa luu thu vien mau tem dung chung tren may chu (rieng tem bao / tem pallet)."""
+        return 'tem_lib_' + (self.kind or 'bao')
+
+    def _srv(self):
+        """Tra ve ket noi may chu neu dang o che do may chu (va khong offline), nguoc lai None."""
+        try:
+            import datastore
+            if datastore.is_offline() or not datastore.is_server():
+                return None
+            return datastore.server()
+        except Exception:
+            return None
+
+    def push_lib(self):
+        """Dua TAT CA mau tem dang co len may chu de cac may khac dung chung (gop theo ten)."""
+        srv = self._srv()
+        if srv is None:
+            messagebox.showinfo('Dùng chung mẫu tem', 'Máy này chưa kết nối máy chủ (đang chạy cục bộ/offline).\n'
+                                'Mẫu tem chỉ lưu trên máy này. Khi có máy chủ hãy bấm lại "⬆ Lên máy chủ".',
+                                parent=self)
+            return
+        if not self.lib:
+            messagebox.showinfo('Dùng chung mẫu tem', 'Chưa có mẫu tem nào để đưa lên máy chủ.', parent=self)
+            return
+        try:
+            shared = srv.kv_get(self._srv_key()) or {}
+            if not isinstance(shared, dict):
+                shared = {}
+            for d in self.lib:
+                nm = (d.get('name') or '').strip()
+                if nm:
+                    shared[nm] = json.loads(json.dumps(d, ensure_ascii=False))
+            srv.kv_put(self._srv_key(), shared)
+        except Exception as e:
+            messagebox.showerror('Dùng chung mẫu tem', 'Không đưa lên máy chủ được:\n%s' % e, parent=self)
+            return
+        self._st('⬆ Đã đưa %d mẫu tem lên máy chủ – các máy khác bấm "⬇ Từ máy chủ" (hoặc mở lại tab) để dùng chung.'
+                 % len(self.lib))
+        messagebox.showinfo('Dùng chung mẫu tem',
+                            'Đã đưa %d mẫu tem lên máy chủ để dùng chung.\n'
+                            'Các máy con sẽ tự nhận khi mở tab này, hoặc bấm "⬇ Từ máy chủ".' % len(self.lib),
+                            parent=self)
+
+    def pull_lib(self, silent=True):
+        """Lay thu vien mau tem dung chung tu may chu, gop vao danh sach may nay (ban tren may chu uu tien)."""
+        srv = self._srv()
+        if srv is None:
+            if not silent:
+                messagebox.showinfo('Dùng chung mẫu tem', 'Máy này chưa kết nối máy chủ (đang chạy cục bộ/offline).',
+                                    parent=self)
+            return
+        try:
+            shared = srv.kv_get(self._srv_key()) or {}
+            if not isinstance(shared, dict):
+                shared = {}
+        except Exception as e:
+            if not silent:
+                messagebox.showerror('Dùng chung mẫu tem', 'Không tải từ máy chủ được:\n%s' % e, parent=self)
+            return
+        if not shared:
+            if not silent:
+                messagebox.showinfo('Dùng chung mẫu tem', 'Trên máy chủ chưa có mẫu tem dùng chung nào.', parent=self)
+            return
+        by = {(d.get('name') or '').strip(): d for d in self.lib if (d.get('name') or '').strip()}
+        added = 0
+        for nm, d in shared.items():
+            if not nm:
+                continue
+            if nm not in by:
+                added += 1
+            by[nm] = d                                  # ban tren may chu la ban dung chung -> uu tien
+        self.lib = list(by.values())
+        try:
+            self._save_lib()
+        except Exception:
+            pass
+        self._fill_lib()
+        if not silent:
+            messagebox.showinfo('Dùng chung mẫu tem',
+                                'Đã tải %d mẫu tem dùng chung từ máy chủ (%d mẫu mới).' % (len(shared), added),
+                                parent=self)
+        elif added:
+            self._st('⬇ Đã nhận %d mẫu tem dùng chung mới từ máy chủ.' % added)
 
     # ------------------------------------------------------------ xem truoc / xuat
     def _schedule(self):
