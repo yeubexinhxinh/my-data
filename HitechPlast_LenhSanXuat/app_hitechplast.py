@@ -5890,9 +5890,21 @@ class ImagePathDialog(tk.Toplevel):
             return
         try:
             n = self.IS.server_counts()
-            self.lbl_srv.config(text=f"Máy chủ đang lưu: {n.get('stamp', 0)} ảnh Tem   •   "
-                                     f"{n.get('pkg', 0)} ảnh Bao bì\n"
-                                     f"Bộ nhớ đệm trên máy này: {self.IS.cache_root()}")
+            cfg = {}
+            try:
+                if datastore.is_server():
+                    cfg = datastore.server().kv_get(IMG_CFG_KEY, track=False) or {}
+            except Exception:
+                cfg = {}
+            sdir = cfg.get('stamp_dir') or ''
+            pdir = cfg.get('pkg_dir') or ''
+            txt = (f"Máy chủ đang lưu: {n.get('stamp', 0)} ảnh Tem   •   {n.get('pkg', 0)} ảnh Bao bì\n"
+                   f"Nơi lưu: database máy chủ (htp_images).")
+            if sdir or pdir:
+                txt += (f"\nThư mục nguồn trên máy chủ:  Tem = {sdir or '(chưa đặt)'}"
+                        f"   •   Bao bì = {pdir or '(chưa đặt)'}")
+            txt += f"\nBộ nhớ đệm trên máy này: {self.IS.cache_root()}"
+            self.lbl_srv.config(text=txt, fg='#1d3557')
         except Exception as e:
             self.lbl_srv.config(text=f'Không đọc được ảnh trên máy chủ: {e}', fg='#c0392b')
 

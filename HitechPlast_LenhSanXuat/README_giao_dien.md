@@ -382,3 +382,14 @@ Ngoài ra sửa `scan_folder` (image_sync.py): trước chỉ quét ảnh trong 
 - `<thư mục>\*.png` (ảnh để thẳng gốc → tự suy Mã KH từ tên file, vd `KSP-...png` → `KSP`).
 
 Chép đè `image_sync.py`.
+
+---
+
+## Cập nhật thêm (đợt 21) — Hiện đường dẫn chỗ lưu ảnh trên máy chủ
+
+Mục "3. Ảnh trên máy chủ" nay hiện thêm:
+- "Nơi lưu: database máy chủ (htp_images)" (ảnh lưu trong DB, mọi máy dùng chung).
+- "Thư mục nguồn trên máy chủ: Tem = … · Bao bì = …" (đọc từ cấu hình chung kv
+  `img_cfg` — chính là thư mục admin đặt ở máy chủ).
+
+Chép đè `app_hitechplast.py`.
