@@ -225,6 +225,17 @@ def donor_capacity(donor_path):
         return MAX_TEXTS, 11
 
 
+def donor_info(donor_path):
+    """Mo ta phoi .btw: {'texts','lines','boxes','page','cap_lines'}. Loi -> None."""
+    try:
+        btw = B.BtwFile(donor_path)
+        g = B.Geometry(btw)
+        return {'texts': len(usable_texts(g)), 'lines': len(g.lines), 'boxes': len(g.boxes),
+                'page': bool(g.page_pat), 'cap_lines': len(g.lines) + 2 * max(0, len(g.boxes) - 1)}
+    except Exception:
+        return None
+
+
 def check_limits(dz, cap_texts=MAX_TEXTS, cap_lines=11):
     """-> danh sach loi (rong = xuat duoc). cap_texts/cap_lines = kha nang cua phoi .btw dang chon."""
     L = compute_layout(dz)
@@ -612,8 +623,20 @@ def export_design(dz, donor_path, out_path, db_values=None):
     errs = check_limits(dz, cap_texts=len(need), cap_lines=len(g.lines))
     if errs:
         raise B.BtwError('\n'.join(errs))
-    if len(need) < len(L['texts']) or len(g.lines) < 1 or not g.boxes or not g.page_pat:
-        raise B.BtwError('File phôi .btw không đủ đối tượng để dựng tem này.')
+    miss = []
+    if len(need) < len(L['texts']):
+        miss.append('ô chữ Text (phôi có %d, tem cần %d)' % (len(need), len(L['texts'])))
+    if len(g.lines) < 1:
+        miss.append('đường kẻ Line (cần ≥1)')
+    if not g.boxes:
+        miss.append('khung chữ nhật Box/Rectangle (cần ≥1 – để vẽ viền bảng)')
+    if not g.page_pat:
+        miss.append('khổ tem/khổ giấy (page size) – phôi chưa đặt kích thước tem')
+    if miss:
+        raise B.BtwError('File phôi .btw thiếu: ' + '; '.join(miss) + '.\n\n'
+                         'Phôi .btw phải là 1 tem BarTender có sẵn: nhiều ô chữ (Text), '
+                         'ít nhất 1 đường kẻ (Line) và 1 khung chữ nhật (Box/Rectangle bao ngoài), '
+                         'và đã đặt khổ tem. Phần mềm chỉ MƯỢN LẠI các đối tượng này (không tạo mới được).')
     g.set_page(d['w_mm'] * MIL, d['h_mm'] * MIL)
     x0, y0, x1, y1 = L['rect']
     # --- khung + duong ke

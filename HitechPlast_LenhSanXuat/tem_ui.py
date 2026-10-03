@@ -1680,9 +1680,27 @@ class DesignTab(tk.Frame):
         self._donor_path = p
         self._save_donor(p)
         self._cap_cache = None                      # phoi moi -> doc lai so o chu / duong ke
-        cap_t, cap_l = self._cap()
         self.v_donor.set(os.path.basename(p))
-        self._st('✔ Phôi .btw: %s  (%d ô chữ · %d đường kẻ)' % (os.path.basename(p), cap_t, cap_l))
+        info = D.donor_info(p)
+        if info is None:
+            messagebox.showwarning('Chọn phôi .btw', 'Không đọc được file phôi này (có đúng file .btw của '
+                                   'BarTender không?).', parent=self)
+            self._st('⚠ Không đọc được phôi %s' % os.path.basename(p))
+        else:
+            thieu = []
+            if info['boxes'] < 1:
+                thieu.append('CHƯA có khung chữ nhật (Box/Rectangle) bao ngoài')
+            if not info['page']:
+                thieu.append('CHƯA đặt khổ tem (page size)')
+            msg = ('Phôi "%s": %d ô chữ · %d đường kẻ · %d khung · khổ tem %s.'
+                   % (os.path.basename(p), info['texts'], info['lines'], info['boxes'],
+                      '✓' if info['page'] else '✗'))
+            if thieu:
+                messagebox.showwarning('Chọn phôi .btw', msg + '\n\n⚠ Phôi này ' + '; '.join(thieu) + '.\n'
+                                       'Để xuất .btw, phôi cần: nhiều ô chữ (Text), ≥1 đường kẻ (Line) và '
+                                       '≥1 khung chữ nhật (Box bao ngoài), và đã đặt khổ tem.\n'
+                                       'Nếu không có phôi đạt yêu cầu, hãy dùng Xuất PDF/Excel/Word.', parent=self)
+            self._st('✔ Phôi .btw: ' + msg)
         self._schedule()                            # ve lai xem truoc + cap nhat canh bao theo phoi moi
 
     def pick_logo(self):
