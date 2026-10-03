@@ -7857,11 +7857,12 @@ class App(tk.Tk):
             self.after(4000, self._standby_tick)
 
     def _restart_presence_msg(self):
-        """Bat lai nhip 'may dang dung' (presence) + tin nhan (messenger) tro vao may chu dang dung."""
+        """Sau khi doi may chu: dam bao nhip 'may dang dung' (presence) chay (no TU BAM THEO may chu
+        dang dung) + khoi dong lai tin nhan (messenger) tro vao may chu moi."""
         u = getattr(self, 'user', {}) or {}
         try:
             import presence
-            presence.stop()
+            # presence tu bam theo datastore.server() -> chi can dam bao dang chay, KHONG stop (tranh gian doan)
             presence.start(u.get('hoten') or u.get('username'), username=u.get('username') or '')
         except Exception:
             pass
