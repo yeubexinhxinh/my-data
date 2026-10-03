@@ -212,3 +212,21 @@ Xuất .btw, Lưu PNG và **🖨 Khổ giấy A3/A4/A5** (A5 = 2 tem + đường
 
 Chép đè `tem_ui.py`. File `tem_designs_pallet.json` sẽ tự tạo khi bạn lưu mẫu
 pallet đầu tiên.
+
+---
+
+## Cập nhật thêm (đợt 11)
+
+### A) Tab "Tạo Mẫu Tem Pallet Từ Ảnh" dùng CHỌN KHỔ GIẤY (không copy y tem bao)
+- Bỏ danh sách preset khổ tem bao (60x90, 60x50...); thay bằng **"Khổ giấy:" A5 / A4 / A3**
+  (chuẩn ISO). Chọn khổ nào thì Rộng×Cao tự đặt theo khổ đó.
+- Mẫu pallet **mặc định khổ A4**; cho phép tới 500mm (A3 = 297×420 vừa đủ).
+- Nhãn hướng dẫn đổi thành "…chọn KHỔ GIẤY (A3/A4/A5)…".
+- Tab "Tạo Mẫu Tem Bao Từ Ảnh" giữ nguyên preset tem bao như cũ.
+
+### B) Cửa sổ "Ảnh theo mốc / DC" không còn "trống trơn" khó hiểu
+Khi mở mà bạn chỉ có lịch **"Chọn DC/mốc"** (không có lịch "Mẫu mới nhất từng dây
+chuyền"), cửa sổ nay **ghi rõ**: cửa sổ này chỉ dùng cho lịch "Mẫu mới nhất từng
+dây chuyền"; còn lịch "Chọn DC/mốc" thì đặt ảnh bằng **Sửa → 🎯 Chọn DC/mốc… →
+bấm cột 🎞/⚪ của từng mốc**. (Đây là đúng thiết kế, không phải lỗi — chỉ thiếu
+hướng dẫn nên nhìn như trống.)

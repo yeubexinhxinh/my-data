@@ -915,6 +915,11 @@ class PreviewWindow(tk.Toplevel):
 # =====================================================================
 import btw_design as D
 
+# Khổ giấy chuẩn cho TEM PALLET (chọn khổ giấy thay cho preset khổ tem bao)
+PAPER_PRESETS = [('A5 – 148 x 210 mm', 148, 210),
+                 ('A4 – 210 x 297 mm', 210, 297),
+                 ('A3 – 297 x 420 mm', 297, 420)]
+
 
 class DesignTab(tk.Frame):
     def __init__(self, master, fill_tab, base_dir=None, lib_name='tem_designs.json', kind=''):
@@ -922,9 +927,12 @@ class DesignTab(tk.Frame):
         self.fill = fill_tab                     # dung chung thu muc luu + mau phoi
         self.base = base_dir or _app_dir()
         self.kind = kind                         # '' = tem bao, 'pallet' = tem pallet
+        self.is_pallet = (kind == 'pallet')
+        self.presets = PAPER_PRESETS if self.is_pallet else D.PRESETS
         self.lib_path = os.path.join(self.base, lib_name)
         self.lib = self._load_lib()
-        self.d = D.normalize(self.lib[0] if self.lib else D.new_design())
+        _def = D.new_design(210, 297) if self.is_pallet else D.new_design()
+        self.d = D.normalize(self.lib[0] if self.lib else _def)
         self.sel = None
         self._busy = False
         self._job = None
@@ -950,9 +958,10 @@ class DesignTab(tk.Frame):
         # --- nguon
         drop = tk.Frame(self, bg='#fff8e1', highlightthickness=2, highlightbackground='#ffb300')
         drop.pack(fill='x', padx=8, pady=(6, 3))
-        self.drop_lbl = tk.Label(drop, text='🎨  KÉO THẢ / Ctrl+V ẢNH TEM MẪU → tự nhận diện khung bảng + chữ '
-                                            '→ chọn kích thước → xuất .btw', bg='#fff8e1', fg='#6d4c00',
-                                 font=FONT_B, pady=7)
+        _drop_txt = ('📦  KÉO THẢ / Ctrl+V ẢNH TEM PALLET → tự nhận diện khung + chữ → chọn KHỔ GIẤY '
+                     '(A3/A4/A5) → xuất' if self.is_pallet else
+                     '🎨  KÉO THẢ / Ctrl+V ẢNH TEM MẪU → tự nhận diện khung bảng + chữ → chọn kích thước → xuất .btw')
+        self.drop_lbl = tk.Label(drop, text=_drop_txt, bg='#fff8e1', fg='#6d4c00', font=FONT_B, pady=7)
         self.drop_lbl.pack(side='left', padx=8)
         bb = tk.Frame(drop, bg='#fff8e1')
         bb.pack(side='right', padx=6)
@@ -971,18 +980,19 @@ class DesignTab(tk.Frame):
         # --- kich thuoc + tuy chon
         sz = ttk.LabelFrame(self, text=' Kích thước tem & kiểu ', padding=(8, 4))
         sz.pack(fill='x', padx=8, pady=3)
-        ttk.Label(sz, text='Khổ có sẵn:').grid(row=0, column=0, sticky='w')
+        ttk.Label(sz, text='Khổ giấy:' if self.is_pallet else 'Khổ có sẵn:').grid(row=0, column=0, sticky='w')
         self.v_pre = tk.StringVar()
-        cb = ttk.Combobox(sz, textvariable=self.v_pre, state='readonly', width=18,
-                          values=[p[0] for p in D.PRESETS] + ['Tự nhập…'])
+        cb = ttk.Combobox(sz, textvariable=self.v_pre, state='readonly',
+                          width=22 if self.is_pallet else 18,
+                          values=[p[0] for p in self.presets] + ['Tự nhập…'])
         cb.grid(row=0, column=1, padx=(4, 12))
         cb.bind('<<ComboboxSelected>>', lambda e: self._preset())
         ttk.Label(sz, text='Rộng').grid(row=0, column=2)
         self.v_w = tk.StringVar()
-        ttk.Spinbox(sz, from_=5, to=400, increment=1, width=6, textvariable=self.v_w).grid(row=0, column=3, padx=2)
+        ttk.Spinbox(sz, from_=5, to=500, increment=1, width=6, textvariable=self.v_w).grid(row=0, column=3, padx=2)
         ttk.Label(sz, text='x Cao').grid(row=0, column=4)
         self.v_h = tk.StringVar()
-        ttk.Spinbox(sz, from_=5, to=400, increment=1, width=6, textvariable=self.v_h).grid(row=0, column=5, padx=2)
+        ttk.Spinbox(sz, from_=5, to=500, increment=1, width=6, textvariable=self.v_h).grid(row=0, column=5, padx=2)
         ttk.Label(sz, text='mm').grid(row=0, column=6)
         ttk.Button(sz, text='⇄ Xoay', command=self.swap).grid(row=0, column=7, padx=6)
         ttk.Label(sz, text='Lề').grid(row=0, column=8)
@@ -1116,7 +1126,7 @@ class DesignTab(tk.Frame):
         self._fill_rows(0)
 
     def _sync_preset(self):
-        key = next((p[0] for p in D.PRESETS if abs(p[1] - self.d['w_mm']) < 0.01 and abs(p[2] - self.d['h_mm']) < 0.01),
+        key = next((p[0] for p in self.presets if abs(p[1] - self.d['w_mm']) < 0.01 and abs(p[2] - self.d['h_mm']) < 0.01),
                    'Tự nhập…')
         self.v_pre.set(key)
 
@@ -1147,7 +1157,7 @@ class DesignTab(tk.Frame):
 
     def _preset(self):
         v = self.v_pre.get()
-        p = next((x for x in D.PRESETS if x[0] == v), None)
+        p = next((x for x in self.presets if x[0] == v), None)
         if p:
             self.v_w.set('%g' % p[1])
             self.v_h.set('%g' % p[2])
