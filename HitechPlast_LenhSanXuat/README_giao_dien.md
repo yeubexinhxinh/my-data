@@ -137,3 +137,16 @@ Chép `rmqr_forms.json` này đè lên file cùng tên trong thư mục phần m
 áp cho **báo cáo tạo MỚI**; báo cáo đã lưu trước đó giữ mẫu cũ. Nếu đã từng sửa
 form (có `BaoCaoNVL/rmqr_forms.json`) thì vào ⚙ Form → "↺ Khôi phục bộ form gốc"
 hoặc sửa tay theo mẫu mới.
+
+---
+
+## Cập nhật thêm (đợt 7) — Nút Xem trước (ai cũng dùng)
+
+Thêm nút **"👁 Xem trước"** trên thanh công cụ (cạnh PDF/Excel). Bấm để xem báo
+cáo **đúng như khi xuất ra** — tạo PDF A4 (có giấy tiêu đề, ô gộp, viền, ảnh,
+phân trang) vào thư mục tạm rồi mở bằng trình xem PDF của máy, **không** ghi vào
+thư mục báo cáo. Dùng được cho **mọi tài khoản** (không cần quyền admin), và xem
+được cả khi đang ở chế độ thiết kế form.
+
+> Báo cáo xuất ra ở dạng **PDF (A4)** và **Excel (.xlsx)**. Nút Xem trước hiển thị
+> đúng bản PDF sẽ xuất. (Cần `pip install reportlab pillow`.)

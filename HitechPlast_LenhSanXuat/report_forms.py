@@ -526,6 +526,7 @@ class ReportFormTab(tk.Frame):
         sep()
         btn('⚖ Kết luận', self.conclude, bg='#5a4b8a', fg='white', bold=True)
         sep()
+        btn('👁 Xem trước', self.preview_report, bg='#495057', fg='white', bold=True)
         btn('📄 PDF', self.export_pdf, bg=CLR['danger'], fg='white', bold=True)
         btn('📊 Excel', self.export_excel, bg='#1e7145', fg='white', bold=True)
         btn('🖨 In', self.print_report, bg='#1d3557', fg='white', bold=True)
@@ -1499,6 +1500,26 @@ class ReportFormTab(tk.Frame):
         if not (self.rec.get('title') or '').strip():
             self._auto_title()
         return self.rec
+
+    def preview_report(self):
+        """Xem truoc dung nhu khi XUAT (PDF A4) - AI cung dung duoc."""
+        if not self.rec and not self.design.get():
+            messagebox.showinfo('Xem trước', 'Hãy mở hoặc tạo một báo cáo trước.', parent=self)
+            return
+        if self._editor:
+            self._commit_editor()
+        rec = self._rec_for_output()
+        import tempfile
+        path = os.path.join(tempfile.gettempdir(),
+                            'XemTruoc_' + _safe_name(rec.get('title') or 'BaoCao') + '.pdf')
+        try:
+            rio.export_pdf(rec, path)
+        except Exception as e:
+            messagebox.showerror('Lỗi xem trước',
+                                 f'Không tạo được bản xem trước:\n{e}\n\n(Cần: pip install reportlab pillow)',
+                                 parent=self)
+            return
+        _open_file(path)
 
     def export_pdf(self):
         if not self.rec and not self.design.get():
