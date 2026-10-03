@@ -1586,16 +1586,19 @@ class DesignTab(tk.Frame):
             self.cv.create_image(self.cv.winfo_width() // 2, self.cv.winfo_height() // 2, image=self._tk)
             L = D.compute_layout(self.d)
             nl = len(L['hlines']) + len(L['vlines'])
-            errs = D.check_limits(self.d)
-            self.lbl_use.configure(text='%g x %g mm · ô chữ %d/17 · đường kẻ %d/11%s' % (
-                self.d['w_mm'], self.d['h_mm'], len(L['texts']), nl, ('  ⚠ ' + errs[0]) if errs else ''),
+            cap_t, cap_l = self._cap()
+            errs = D.check_limits(self.d, cap_texts=cap_t, cap_lines=cap_l)
+            self.lbl_use.configure(text='%g x %g mm · ô chữ %d/%d · đường kẻ %d/%d%s' % (
+                self.d['w_mm'], self.d['h_mm'], len(L['texts']), cap_t, nl, cap_l,
+                ('  ⚠ ' + errs[0]) if errs else ''),
                 foreground='#b00020' if errs else '#1f3a5f')
         except Exception as ex:
             self.cv.delete('all')
             self.cv.create_text(10, 10, anchor='nw', text='Lỗi xem trước: %s' % ex, fill='#b00020')
 
     def preview_big(self):
-        errs = D.check_limits(self.d)
+        cap_t, cap_l = self._cap()
+        errs = D.check_limits(self.d, cap_texts=cap_t, cap_lines=cap_l)
         if errs:
             messagebox.showwarning('Xem trước', '\n'.join(errs), parent=self)
         img = D.render_design(self.d, px_per_mm=12)
@@ -1676,8 +1679,11 @@ class DesignTab(tk.Frame):
             return
         self._donor_path = p
         self._save_donor(p)
+        self._cap_cache = None                      # phoi moi -> doc lai so o chu / duong ke
+        cap_t, cap_l = self._cap()
         self.v_donor.set(os.path.basename(p))
-        self._st('✔ Phôi .btw: %s' % os.path.basename(p))
+        self._st('✔ Phôi .btw: %s  (%d ô chữ · %d đường kẻ)' % (os.path.basename(p), cap_t, cap_l))
+        self._schedule()                            # ve lai xem truoc + cap nhat canh bao theo phoi moi
 
     def pick_logo(self):
         """Chọn ảnh logo hiển thị ở ĐẦU tem (tem pallet) - hiện trong PDF/Excel/Word."""
@@ -1709,6 +1715,19 @@ class DesignTab(tk.Frame):
             raise B.BtwError('Thiếu file phôi %s cạnh phần mềm.' % DEFAULT_TPL)
         return p
 
+    def _cap(self):
+        """(so o chu, so duong ke) cua phoi .btw dang chon - doc 1 lan roi cache theo duong dan phoi."""
+        try:
+            p = self._donor()
+        except Exception:
+            return (D.MAX_TEXTS, 11)
+        c = getattr(self, '_cap_cache', None)
+        if c and c[0] == p:
+            return c[1]
+        cap = D.donor_capacity(p)
+        self._cap_cache = (p, cap)
+        return cap
+
     def _donor_hint(self):
         """Gợi ý khi không xuất .btw được vì phôi mặc định (tem bao) không đủ ô."""
         using_default = not (getattr(self, '_donor_path', '') and os.path.exists(self._donor_path))
@@ -1720,7 +1739,8 @@ class DesignTab(tk.Frame):
         return ''
 
     def export(self):
-        errs = D.check_limits(self.d)
+        cap_t, cap_l = self._cap()
+        errs = D.check_limits(self.d, cap_texts=cap_t, cap_lines=cap_l)
         if errs:
             # Phoi .btw khong du o -> de nghi xuat PDF (khong gioi han so dong)
             if messagebox.askyesno(

@@ -195,16 +195,48 @@ def compute_layout(dz):
             'logo_rect': logo_rect}
 
 
-def check_limits(dz):
-    """-> danh sach loi (rong = xuat duoc)"""
+def _text_num(n):
+    try:
+        return int(str(n).split()[-1])
+    except Exception:
+        return 99999
+
+
+def usable_texts(g):
+    """Danh sach TEN o chu dung duoc cua phoi: uu tien thu tu TEXT_ORDER (cho cac o dac biet
+    Text 17 neo giua / Text 13 can trai / Text 12 lay tu Excel), roi them MOI o 'Text N' khac
+    co trong phoi -> phoi co cang nhieu o chu thi lam duoc cang nhieu dong."""
+    present = [n for n in TEXT_ORDER if n in g.texts]
+    extra = sorted((n for n in g.texts if n not in TEXT_ORDER and str(n).startswith('Text ')),
+                   key=_text_num)
+    return present + extra
+
+
+def donor_capacity(donor_path):
+    """(so o chu, so duong ke HIEU DUNG) ma phoi .btw nay cung cap duoc. Loi -> (MAX_TEXTS, 11).
+    So duong ke hieu dung = so duong ke + 2*(so khung chu nhat - 1): moi khung phu thay cho 2 duong
+    ngang (xem export_design). Phoi mac dinh AA06: 7 duong + 3 khung -> 7 + 2*2 = 11 (giu nguyen nhu cu)."""
+    try:
+        btw = B.BtwFile(donor_path)
+        g = B.Geometry(btw)
+        eff_lines = len(g.lines) + 2 * max(0, len(g.boxes) - 1)
+        return max(1, len(usable_texts(g))), max(1, eff_lines)
+    except Exception:
+        return MAX_TEXTS, 11
+
+
+def check_limits(dz, cap_texts=MAX_TEXTS, cap_lines=11):
+    """-> danh sach loi (rong = xuat duoc). cap_texts/cap_lines = kha nang cua phoi .btw dang chon."""
     L = compute_layout(dz)
     err = []
-    if len(L['texts']) > MAX_TEXTS:
-        err.append('Tem có %d dòng chữ – mẫu gốc chỉ có %d ô chữ. Gộp bớt / xoá bớt dòng.'
-                   % (len(L['texts']), MAX_TEXTS))
-    if len(L['hlines']) + len(L['vlines']) > 11:
-        err.append('Quá nhiều đường kẻ (%d, tối đa 11). Bỏ kẻ dưới vài dòng hoặc bớt dòng.'
-                   % (len(L['hlines']) + len(L['vlines'])))
+    if len(L['texts']) > cap_texts:
+        err.append('Tem có %d dòng chữ – phôi .btw đang dùng chỉ có %d ô chữ. '
+                   'Gộp bớt / xoá bớt dòng, hoặc chọn phôi .btw có nhiều ô chữ hơn.'
+                   % (len(L['texts']), cap_texts))
+    if len(L['hlines']) + len(L['vlines']) > cap_lines:
+        err.append('Quá nhiều đường kẻ (%d, phôi chỉ có %d). Bỏ kẻ dưới vài dòng '
+                   'hoặc chọn phôi .btw có nhiều đường kẻ hơn.'
+                   % (len(L['hlines']) + len(L['vlines']), cap_lines))
     return err
 
 
@@ -572,14 +604,14 @@ def _cell_text(bx):
 def export_design(dz, donor_path, out_path, db_values=None):
     """Ghi thiet ke thanh file .btw. -> (duong dan .btw, duong dan Excel du lieu)
     db_values: noi dung cho o chu lay tu Excel (Text 12) - nhieu gia tri = in nhieu tem."""
-    errs = check_limits(dz)
-    if errs:
-        raise B.BtwError('\n'.join(errs))
     L = compute_layout(dz)
     d = L['d']
     btw = B.BtwFile(donor_path)
     g = B.Geometry(btw)
-    need = [n for n in TEXT_ORDER if n in g.texts]
+    need = usable_texts(g)                         # tat ca o chu dung duoc cua phoi (khong gioi han 17)
+    errs = check_limits(dz, cap_texts=len(need), cap_lines=len(g.lines))
+    if errs:
+        raise B.BtwError('\n'.join(errs))
     if len(need) < len(L['texts']) or len(g.lines) < 1 or not g.boxes or not g.page_pat:
         raise B.BtwError('File phôi .btw không đủ đối tượng để dựng tem này.')
     g.set_page(d['w_mm'] * MIL, d['h_mm'] * MIL)
