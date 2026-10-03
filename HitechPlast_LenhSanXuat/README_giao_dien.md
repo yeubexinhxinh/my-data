@@ -316,3 +316,16 @@ Xuất PDF** (A3/A4/A5, không giới hạn số dòng) để luôn ra được 
 "Chọn phôi .btw…" nếu bạn có phôi tem pallet đủ ô.
 
 Chép đè `tem_ui.py`.
+
+---
+
+## Cập nhật thêm (đợt 17) — Logo cho tem Pallet (hiện trong PDF/Excel/Word)
+
+Tab "Tạo Mẫu Tem Pallet Từ Ảnh" có nút **🖼 Logo…** (và ✖ để bỏ). Chọn ảnh logo
+→ logo hiện ở **ĐẦU tem** (dải trên), căn giữa, giữ tỉ lệ; bảng tụt xuống dưới mà
+**không đổi khổ tem**. Logo hiển thị trong Xem trước và các bản **PDF/Excel/Word**.
+
+Code: `btw_design.py` thêm `logo`/`logo_h` vào thiết kế; `compute_layout` chừa dải
+logo (`logo_rect`); `render_design` vẽ logo. Chép đè `btw_design.py` + `tem_ui.py`.
+
+> Lưu ý: logo chỉ áp cho bản ảnh/PDF/Excel/Word (vì .btw của phôi không có ô ảnh).

@@ -1181,6 +1181,12 @@ class DesignTab(tk.Frame):
         self.v_donor = tk.StringVar(value=(os.path.basename(self._donor_path) if self._donor_path else '(mặc định)'))
         tk.Label(ob, textvariable=self.v_donor, bg='#f4f6f9', fg='#1f6f3f', font=FONT).pack(side='left')
         ttk.Button(ob, text='Chọn phôi .btw…', command=self.pick_donor).pack(side='left', padx=4)
+        if self.is_pallet:
+            tk.Label(ob, text='   Logo:', bg='#f4f6f9', font=FONT).pack(side='left')
+            self.v_logo = tk.StringVar(value=(os.path.basename(self.d.get('logo')) if self.d.get('logo') else '(không)'))
+            tk.Label(ob, textvariable=self.v_logo, bg='#f4f6f9', fg='#1f6f3f', font=FONT).pack(side='left')
+            ttk.Button(ob, text='🖼 Logo…', command=self.pick_logo).pack(side='left', padx=2)
+            ttk.Button(ob, text='✖', width=2, command=self.clear_logo).pack(side='left')
 
         bt = tk.Frame(self, bg='#f4f6f9')
         bt.pack(fill='x', padx=8, pady=(2, 2))
@@ -1576,6 +1582,27 @@ class DesignTab(tk.Frame):
         self._save_donor(p)
         self.v_donor.set(os.path.basename(p))
         self._st('✔ Phôi .btw: %s' % os.path.basename(p))
+
+    def pick_logo(self):
+        """Chọn ảnh logo hiển thị ở ĐẦU tem (tem pallet) - hiện trong PDF/Excel/Word."""
+        p = filedialog.askopenfilename(parent=self, title='Chọn ảnh logo (đầu tem)',
+                                       filetypes=[('Ảnh', '*.png *.jpg *.jpeg *.bmp *.gif *.webp')],
+                                       initialdir=self._outdir())
+        if not p:
+            return
+        self.d['logo'] = p
+        if not self.d.get('logo_h'):
+            self.d['logo_h'] = max(14.0, round(self.d.get('h_mm', 100) * 0.14))
+        if hasattr(self, 'v_logo'):
+            self.v_logo.set(os.path.basename(p))
+        self._schedule()
+        self._st('✔ Logo: %s' % os.path.basename(p))
+
+    def clear_logo(self):
+        self.d['logo'] = ''
+        if hasattr(self, 'v_logo'):
+            self.v_logo.set('(không)')
+        self._schedule()
 
     def _donor(self):
         p = getattr(self, '_donor_path', '') or ''
