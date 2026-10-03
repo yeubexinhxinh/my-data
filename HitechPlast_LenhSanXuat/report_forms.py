@@ -574,7 +574,8 @@ class ReportFormTab(tk.Frame):
                                   ('➕ Cột trái', lambda: self.d_cols(0, 1)), ('➕ Cột phải', lambda: self.d_cols(1, 1)),
                                   ('➖ Xoá cột', lambda: self.d_cols(0, -1)))),
                           (row2, (('↕ Cao hàng', self.d_row_height), ('↔ Rộng cột', self.d_col_width),
-                                  ('🖼 Ảnh mẫu', self.d_tpl_image), ('✖ Xoá ảnh mẫu', self.d_del_tpl_image),
+                                  ('🖼 Ảnh mẫu', self.d_tpl_image), ('↔ Fit ảnh mẫu', lambda: self.d_fit_tpl_image('fill')),
+                                  ('✖ Xoá ảnh mẫu', self.d_del_tpl_image),
                                   ('⧉ Copy ô', self.d_copy_cell), ('📋 Paste ô', self.d_paste_cell),
                                   ('🏷 Đặt ô Tên NVL', self.d_name_cell), ('📅 Đặt ô Ngày trả KQ', self.d_date_cell),
                                   ('🧾 Đặt ô Kết luận', self.d_concl_cell)))):
@@ -1456,6 +1457,8 @@ class ReportFormTab(tk.Frame):
             m.add_separator()
             m.add_command(label='🖼 Chèn ảnh mẫu vào vùng…', command=self.d_tpl_image)
             m.add_command(label='📋 Dán ảnh mẫu (Ctrl+V)', command=self.paste_image)
+            m.add_command(label='↔ Fit ảnh mẫu vừa ô khung', command=lambda: self.d_fit_tpl_image('fill'))
+            m.add_command(label='⤢ Ảnh mẫu giữ tỉ lệ', command=lambda: self.d_fit_tpl_image('contain'))
             m.add_command(label='✖ Xoá ảnh mẫu trong vùng', command=self.d_del_tpl_image)
         else:
             m.add_command(label='✏ Nhập / sửa ô (Enter)', command=self._start_edit)
@@ -1731,6 +1734,24 @@ class ReportFormTab(tk.Frame):
             self.rec.setdefault('images', []).append(item)
         self._mark()
         self.redraw()
+
+    def d_fit_tpl_image(self, mode='fill'):
+        """ADMIN: fit ANH MAU (template) trong o dang chon vua o khung / giu ti le."""
+        if not self._need_design():
+            return
+        ims = [im for im in self._imgs_in_sel() if im.get('tpl') is not None]
+        if not ims:
+            messagebox.showinfo('Không có ảnh mẫu', 'Chọn ô có ảnh mẫu để chỉnh.', parent=self)
+            return
+        tpl_imgs = self.tpl.get('images', [])
+        for im in ims:
+            i = im.get('tpl')
+            if i is not None and 0 <= i < len(tpl_imgs):
+                if mode == 'contain':
+                    tpl_imgs[i].pop('fit', None)
+                else:
+                    tpl_imgs[i]['fit'] = mode
+        self._tpl_changed()
 
     def fit_image_cell(self, mode='fill'):
         """Chinh anh trong o dang chon: 'fill' = phu kin o khung (rong = o);

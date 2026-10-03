@@ -117,3 +117,23 @@ Tất cả thao tác ảnh dưới đây **người dùng thường đều làm 
   ảnh **phủ kín ô khung, độ rộng = ô**. Bấm **"⤢ Ảnh giữ tỉ lệ"** để trả về mặc định.
 - Chế độ fit được **lưu theo ảnh** và áp dụng đồng nhất cả **trên màn hình, PDF và
   Excel** (thêm `fit_box2` + cờ `fit` cho mỗi ảnh).
+
+---
+
+## Cập nhật thêm (đợt 6)
+
+### 1) Admin fit được ảnh MẪU
+Trong "✏ Thiết kế form": thanh cam có nút **"↔ Fit ảnh mẫu"**, và chuột phải có
+**"↔ Fit ảnh mẫu vừa ô khung"** / **"⤢ Ảnh mẫu giữ tỉ lệ"**. Admin chỉnh ảnh mẫu
+(ảnh cố định của form) phủ kín ô hoặc giữ tỉ lệ — áp dụng cả màn hình/PDF/Excel.
+
+### 2) Thêm ô nhập tiêu chuẩn Độ trắng / Độ sáng (6 form Chất Độn Khác)
+File `rmqr_forms.json` đã cập nhật cho 6 form: Titan Dioxit, Cao Lanh, Bari
+Sunfat, Natri Sunfat, Talc, Bột Đá NaNo. Ở **phần I (Tiêu chuẩn)**:
+- Nhãn đổi sang tiếng Việt: **"Độ trắng (Whiteness)"**, **"Độ sáng (Brightness)"**.
+- Ô nhập tiêu chuẩn bên cạnh (cột E) được tô **nền vàng nhạt** để thấy rõ chỗ nhập.
+
+Chép `rmqr_forms.json` này đè lên file cùng tên trong thư mục phần mềm. Lưu ý: chỉ
+áp cho **báo cáo tạo MỚI**; báo cáo đã lưu trước đó giữ mẫu cũ. Nếu đã từng sửa
+form (có `BaoCaoNVL/rmqr_forms.json`) thì vào ⚙ Form → "↺ Khôi phục bộ form gốc"
+hoặc sửa tay theo mẫu mới.
