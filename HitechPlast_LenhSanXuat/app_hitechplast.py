@@ -2031,13 +2031,33 @@ IMG_CFG_KEY = 'img_cfg'
 
 
 def _is_server_host():
-    """May DANG CHAY co phai chinh MAY CHU (host CSDL = localhost) khong."""
+    """May DANG CHAY co phai chinh MAY CHU CSDL dang hoat dong khong.
+    Ho tro 2 may chu (chinh + du phong): may nao dang la server (dia chi cau hinh
+    trung LAN/Tailscale/Radmin/ten may cua may nay, hoac cau hinh 'localhost') -> True.
+    => Khi failover sang may du phong, chinh may du phong se la host va ghi folder cua no."""
     if not datastore.is_server():
         return False
     try:
         import presence
-        hosts = presence.server_hosts() or []
-        return any(h in ('localhost', '127.0.0.1', '::1') for h in hosts)
+        import socket
+        hosts = set(presence.server_hosts() or [])
+        if not hosts:
+            return False
+        if any(h in ('localhost', '127.0.0.1', '::1') for h in hosts):
+            return True
+        mine = set()
+        for fn in (presence.lan_ip, presence.ts_ip, presence.rm_ip):
+            try:
+                v = fn()
+                if v:
+                    mine.add(str(v).strip().lower())
+            except Exception:
+                pass
+        try:
+            mine.add(socket.gethostname().strip().lower())
+        except Exception:
+            pass
+        return bool(mine & hosts)
     except Exception:
         return False
 

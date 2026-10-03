@@ -414,3 +414,20 @@ Sửa:
 > đường dẫn của máy chủ; các máy khác sẽ thấy đúng.
 
 Chép đè `app_hitechplast.py`.
+
+---
+
+## Cập nhật thêm (đợt 23) — 2 máy chủ (chính + dự phòng): lấy folder của máy đang là chính
+
+`_is_server_host()` nay nhận diện máy chủ theo **địa chỉ thật** (LAN / Tailscale /
+Radmin VPN / tên máy) chứ không chỉ `localhost`. Nhờ đó:
+- Máy chủ CHÍNH và máy chủ DỰ PHÒNG, máy nào đang là server (địa chỉ cấu hình trùng
+  địa chỉ của chính nó) thì **tự ghi thư mục nguồn của nó** vào DB của nó.
+- Cấu hình thư mục (kv `img_cfg`) nằm trong DB của server đang kết nối → khi
+  **failover sang máy dự phòng**, các máy đọc kv từ DB dự phòng → **tự hiện folder
+  của máy chủ đang hoạt động**.
+
+> Nên đặt thư mục nguồn ảnh (bấm Lưu) **trên CẢ 2 máy chủ** một lần, để DB mỗi máy
+> đều có cấu hình; khi chuyển sang máy nào thì hiện đúng folder máy đó.
+
+Chép đè `app_hitechplast.py`.
